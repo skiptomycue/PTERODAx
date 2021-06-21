@@ -18,7 +18,8 @@ T = dep.days[-1]*24*3600
 MXT=ST.MicroXSTuple
 
 #tempo = np.linspace(0,5,20).tolist() + np.linspace(5,100,30).tolist()[1:] + np.linspace(100,giorni,50).tolist()[1:]
-tempo = np.linspace(0,5,10).tolist() + np.linspace(5,100,15).tolist()[1:] + np.linspace(100,giorni,25).tolist()[1:]
+#tempo = np.linspace(0,5,10).tolist() + np.linspace(5,100,15).tolist()[1:] + np.linspace(100,giorni,25).tolist()[1:]
+tempo = np.linspace(0,5,5).tolist() + np.linspace(5,100,10).tolist()[1:] + np.linspace(100,giorni,10).tolist()[1:]
 #tempo = np.linspace(0,giorni, 500).tolist()
 
 steps = len(tempo)
@@ -551,7 +552,6 @@ for key in xs.keys():
 
     xs[key] = np.zeros((ene,steps,len(At)))
 
-print(xs['18'])
 
 
 

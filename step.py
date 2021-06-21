@@ -34,6 +34,7 @@ ene = nucData.ene
 reg = 3
 
 where = nucData.where
+nodo = nucData.nodo
 
 delta = '\u0394'
 square= '\u00b2'
@@ -52,10 +53,10 @@ s = 1000
 ### PERTURBATION  ###
 #####################88
 
-PERT = ['922380', '922350']
+PERT = ['922350']
 respId = nucData.ZAI.index('942390')
 pert = 1.01
-
+PERTid = nucData.ZAI.index(PERT[0])
 
 ##############
 ### DEFINE ###
@@ -282,7 +283,9 @@ def adjoStep(res, **kwargs):
     ind_2=np.zeros(len(res.comp[0])).tolist()
     dir_1=np.zeros(len(res.comp[0])).tolist()
 
-    if 'respId' in kwargs.keys() and 'covx' not in kwargs.keys():
+    S = np.zeros(ene).tolist()
+
+    if 'respId' in kwargs.keys() and 'xs' not in kwargs.keys():
         respId = kwargs['respId']
 
         Ns[respId] = 1
@@ -523,9 +526,13 @@ def adjoStep(res, **kwargs):
 
         adjoRes.ind.append([ind_2, dir_1, ind_1, ind_3, sk, Ns])
 
-    if 'respId' in kwargs.keys() and 'covx' in kwargs.keys():
+    if 'respId' in kwargs.keys() and 'xs' in kwargs.keys():
 
         respId = kwargs['respId']
+
+        RESP = res.comp[-1][respId]
+
+        xs_pert = kwargs['xs']
 
         Ns[respId] = 1
         Nss = Ns
@@ -616,22 +623,33 @@ def adjoStep(res, **kwargs):
 
             Beta = fun.beta(Psi, lam, No, v)
 
-            Pi = rr['fission'].copy()*sig['v']
 
-            ind_1= [ind_1[j] + np.inner(G, Beta[j]) for j in range(Beta.shape[0])]
-            ind_2= [ind_2[j] - Ps * Pi[j] for j in range(Beta.shape[0])]
-            dir_1= [dir_1[j] + Ns1[j]-Ns[j] for j in range(Beta.shape[0])]
+            Pi = rr['fission'].copy()*sig['v']
 
             Ns = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
 
             SS=Ns1.copy()
 
+            # SENSITIVITY
+
+            Beta_sig = fun.betaSig(Psi, lam, xs_pert, No, G, v)
+            Bate_sig = fun.bateSig(Psi, Phi, xs_pert, No, Ns, v)
+            Pi_sig   = fun.PiSig(Psi, Phi, xs_pert, No, v)
+
+            # *sig['18'][e][nucData.nodo][PERTid]/RESP
+
+            S = [S[e] + (Bate_sig[e] + Beta_sig[e] + Pi_sig[e]) for e in range(ene)]
+
+            ind_1= [Beta_sig[e] for e in range(ene)]
+            ind_2= [Pi_sig[e] for e in range(ene)]
+            dir_1= [Beta_sig[e] for e in range(ene)]
+
             print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
             sys.stdout.flush()
 
-        adjoRes.ind.append([ind_2, dir_1, ind_1, Ns])
+        adjoRes.ind.append([dir_1, ind_1, ind_2, S])
 
-    print("100% complete                ", end='\r' )
+    print("100% complete                ", end='\r'+'\n\n' )
 
     adjoRes.comp = adjoRes.comp[::-1]
     adjoRes.pow = adjoRes.pow[::-1]
@@ -958,6 +976,32 @@ def fluxSnap(flux, name, UM, **kwargs):
 
     fig.savefig('flux/' + name + '_snap.png')
 
+def bunSnap(res, name, **kwargs):
+
+    x = nucData.grid[:-1]
+
+    fig, axs = plt.subplots()
+
+    lab = ['at. density', 'flux shape', 'power', 'total']
+    col = ['green', 'orange', 'brown', 'red']
+
+    j = 0
+
+    for flux in res:
+
+        y=[flux[j] for j in range(len(flux))]
+
+        axs.plot(x, y, col[j], label=lab[j])
+        axs.set(xlabel='Energy [MeV]', ylabel=name, title=nucData.nuc[respId].name+' Sensitivity spectrum')
+
+        #axs.set_yscale('log')
+        axs.set_xscale('log')
+        axs.legend(loc='upper right')
+
+        j+=1
+
+    fig.savefig('flux/' + name + '_snap.png')
+
 def printTime():
     end = datetime.now()
     diff = end - start
@@ -996,8 +1040,11 @@ def main(**kwargs):
 
         print('\n\nAdjoint calculation\n')
 
-        adjoRes=adjoStep(res, respId=respId)
+
+        adjoRes=adjoStep(res, respId=respId, xs='18')
+        #adjoRes=adjoStep(res, respId=respId)
         #resKeff=adjoStep(res, keff=True)
+
 
         adjoPrint = False
 
@@ -1017,11 +1064,13 @@ def main(**kwargs):
 
         flu = adjoRes
 
+        bunSnap(adjoRes.ind[0], 'sensitivity')
+
         #fluxPlot(flu.flux, 'Adjoint Flux', '')
         #fluxPlot(flu.source, 'Adjoint Source', '')
         #fluxPlot(flu.homo, 'Homogeneous adjoint Flux', '')
 
-        adjoPlot(res, adjoRes, respId = respId)
+        #adjoPlot(res, adjoRes, respId = respId)
         #adjoPlot(res, resKeff, resp='keff')
 
 main(ptero=True)

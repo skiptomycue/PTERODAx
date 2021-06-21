@@ -7,7 +7,7 @@ import onix
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from periodictable import elements
-
+import copy
 
 ####################
 ### NUCLEAR DATA ###
@@ -45,7 +45,7 @@ class Results:
 
 ### transport matrix ###
 
-def buildFiss(N, sig, t):
+def buildFiss(N, sigma, t):
 
     reg = 3
 
@@ -54,13 +54,13 @@ def buildFiss(N, sig, t):
     for i in range(ene):
         for j in range(ene):
 
-            F[i][j] = np.diag(N.dot(sig['18'][i][t] * sig['nu'][i])) * chi[j]
+            F[i][j] = np.diag(N.dot(sigma['18'][i][t] * sig['nu'][i])) * chi[j]
 
     mtx = np.vstack(np.dstack(np.array(F)))
 
     return mtx
 
-def buildPozz(N, sig, t):
+def buildPozz(N, sigma, t):
 
     reg = 3
 
@@ -68,7 +68,7 @@ def buildPozz(N, sig, t):
 
     for i in range(ene):
 
-        A[i][i] = np.diag(N.dot(sig['removal'][i][t]))
+        A[i][i] = np.diag(N.dot(sigma['removal'][i][t]))
 
     mtx = np.vstack(np.dstack(np.array(A)))
 
@@ -117,13 +117,13 @@ def buildSca(scatt):
 
     return sca
 
-def boltzL(N, sig, t):
+def boltzL(N, sigma, t):
 
     S = buildSca(nucData.scatt)
 
     T = buildTrasp(nucData.Albe, t)
 
-    A = buildPozz(N, sig, t)
+    A = buildPozz(N, sigma, t)
 
     if N.ravel()[-1] == 0:
         S=S*0
@@ -131,14 +131,14 @@ def boltzL(N, sig, t):
 
     return A+S+T
 
-def boltzF(N, sig, t):
+def boltzF(N, sigma, t):
 
-    F = buildFiss(N, sig, t)
+    F = buildFiss(N, sigma, t)
 
     return F
 
-def Boltz(N, sig, t, lam):
-    A = boltzL(N, sig, t) - lam * boltzF(N, sig, t)
+def Boltz(N, sigma, t, lam):
+    A = boltzL(N, sigma, t) - lam * boltzF(N, sigma, t)
 
     return A
 
@@ -370,19 +370,65 @@ def beta2(Gh, lam, N, t):
 
     return np.array(BETA)
 
-def betaSig(Psi, lam, pert, N, t):
 
-    XS = nucData.xs.copy()
+def betaSig(Psi, lam, pert, N, G, t):
+
     BETA = []
+    N[-1] = 0
+    isotope = nucData.ZAI.index('922350')
+
+    for e in range(ene):
+
+        XS = copy.deepcopy(nucData.xs)
+        XS[pert][e][nucData.nodo][isotope]=1
+
+        B = Boltz(N * where, XS, nucData.nodo, lam)
+
+        BETA.append(tramezzino(Psi,G,B))
+
+    return np.array(BETA)
+
+def bateSig(Psi, Phi, pert, N, Ns, t):
+
+
+    BATE = []
+    N[-1] = 0
+    isotope = nucData.ZAI.index('922350')
+    psi = reshapePsi(Psi)
 
 
     for e in range(ene):
 
-        XS[pert][e]=np.ones((steps,len(N)))
+        XS = copy.deepcopy(nucData.xs)
+        XS[pert][e][nucData.nodo][isotope]=1
 
-        BETA.append(Boltz(N, XS, t, lam).dot(np.array(Psi)))
+        r = rr(XS,psi,Phi,t)
+        PL = updatePL(pl,r)
 
-    return np.array(BETA)
+        R = onixR(PL)
+
+        BATE.append(tramezzino(N,Ns,R))
+
+    return np.array(BATE)
+
+def PiSig(Psi, Phi, pert, N, t):
+
+
+    PI = []
+    N[-1] = 0
+    isotope = nucData.ZAI.index('922350')
+    psi = reshapePsi(Psi)
+
+    for e in range(ene):
+
+        XS = copy.deepcopy(nucData.xs)
+        XS[pert][e][nucData.nodo][isotope]=1
+
+        r = rr(XS,psi,Phi,t)
+
+        PI.append(r['fission'][isotope]*sig['v'][isotope]*N[isotope])
+
+    return np.array(PI)
 
 def dR(Psi, Gh, N, k, t):
 
