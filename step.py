@@ -57,6 +57,8 @@ PERT = ['922350']
 respId = nucData.ZAI.index('942390')
 pert = 1.01
 PERTid = nucData.ZAI.index(PERT[0])
+MT = '18'
+reac = 'fission'
 
 ##############
 ### DEFINE ###
@@ -528,6 +530,10 @@ def adjoStep(res, **kwargs):
 
     if 'respId' in kwargs.keys() and 'xs' in kwargs.keys():
 
+        ind_1 = np.zeros(ene).tolist()
+        ind_2 = np.zeros(ene).tolist()
+        dir_1 = np.zeros(ene).tolist()
+
         respId = kwargs['respId']
 
         RESP = res.comp[-1][respId]
@@ -576,7 +582,7 @@ def adjoStep(res, **kwargs):
 
             adjoRes.comp.append(Ns)
 
-            adjoRes.ind.append([ind_2,dir_1,ind_1, Ns])
+            adjoRes.ind.append([dir_1, ind_1, ind_2, S])
 
             dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
 
@@ -632,17 +638,18 @@ def adjoStep(res, **kwargs):
 
             # SENSITIVITY
 
-            Beta_sig = fun.betaSig(Psi, lam, xs_pert, No, G, v)
-            Bate_sig = fun.bateSig(Psi, Phi, xs_pert, No, Ns, v)
-            Pi_sig   = fun.PiSig(Psi, Phi, xs_pert, No, v)
+            Beta_sig = fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)*Phi
+            Bate_sig = fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns,SS], PERTid, v, dt)
+            Pi_sig   = fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Phi
 
-            # *sig['18'][e][nucData.nodo][PERTid]/RESP
+            # *sig['18'][e][v][PERTid]/RESP
 
-            S = [S[e] + (Bate_sig[e] + Beta_sig[e] + Pi_sig[e]) for e in range(ene)]
+            S = [S[e] + (Bate_sig[e] + Beta_sig[e] + Pi_sig[e])*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
 
-            ind_1= [Beta_sig[e] for e in range(ene)]
-            ind_2= [Pi_sig[e] for e in range(ene)]
-            dir_1= [Beta_sig[e] for e in range(ene)]
+
+            ind_1= [ind_1[e] + Beta_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
+            ind_2= [ind_2[e] + Pi_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
+            dir_1= [dir_1[e] + Bate_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
 
             print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
             sys.stdout.flush()
@@ -976,31 +983,32 @@ def fluxSnap(flux, name, UM, **kwargs):
 
     fig.savefig('flux/' + name + '_snap.png')
 
-def bunSnap(res, name, **kwargs):
+def bunSnap(resu, name, xs):
 
     x = nucData.grid[:-1]
 
     fig, axs = plt.subplots()
 
-    lab = ['at. density', 'flux shape', 'power', 'total']
-    col = ['green', 'orange', 'brown', 'red']
+    lin = [(0, ()), (0, ()), (0, ()), (0, (2,2))]
+    lab = ['at. density', 'flux shape', 'power', 'TOTAL']
+    col = ['green', 'orange', 'brown', 'blue']
 
     j = 0
 
-    for flux in res:
+    for flux in resu:
 
-        y=[flux[j] for j in range(len(flux))]
+        y = flux
+        axs.step(x, y, col[j], linestyle= lin[j], where = 'pre', label=lab[j])
+        tit = 'EOL '+nucData.nuc[respId].name+' Sensitivity to '+nucData.nuc[PERTid].name+' '+xs+' cross section\n'
+        axs.set(xlabel='Energy [MeV]', ylabel='sensitivity', title=tit)
 
-        axs.plot(x, y, col[j], label=lab[j])
-        axs.set(xlabel='Energy [MeV]', ylabel=name, title=nucData.nuc[respId].name+' Sensitivity spectrum')
-
-        #axs.set_yscale('log')
+        #axs.set_yscale('symlog')
         axs.set_xscale('log')
-        axs.legend(loc='upper right')
+        axs.legend(loc='best')
 
         j+=1
 
-    fig.savefig('flux/' + name + '_snap.png')
+    fig.savefig('flux/sensitivity_to_'+name+'_snap.png')
 
 def printTime():
     end = datetime.now()
@@ -1040,8 +1048,7 @@ def main(**kwargs):
 
         print('\n\nAdjoint calculation\n')
 
-
-        adjoRes=adjoStep(res, respId=respId, xs='18')
+        adjoRes=adjoStep(res, respId=respId, xs=MT)
         #adjoRes=adjoStep(res, respId=respId)
         #resKeff=adjoStep(res, keff=True)
 
@@ -1055,7 +1062,7 @@ def main(**kwargs):
             print('\nComp\n')
 
             print(adjoRes.comp[0][0])
-            print(adjoRes.comp[-1][-1])
+            #print(adjoRes.comp[-1][-1])
 
         ### plot ###
 
@@ -1064,7 +1071,7 @@ def main(**kwargs):
 
         flu = adjoRes
 
-        bunSnap(adjoRes.ind[0], 'sensitivity')
+        bunSnap(adjoRes.ind[0], PERT[0], reac)
 
         #fluxPlot(flu.flux, 'Adjoint Flux', '')
         #fluxPlot(flu.source, 'Adjoint Source', '')

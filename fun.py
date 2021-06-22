@@ -153,8 +153,8 @@ def reshapePsi(Psi):
 reaz = ['fission', '(n,gamma)', '(n,2n)', '(n,3n)', '(n,p)', '(n,a)', 'removal', 'sca']
 MT = ['18', '102', '16', '17', '103', '107', 'removal', 'sca']
 
-def rr(sig, psi, Phi, t):
-    rr = sig.copy()
+def rr(sigma, psi, Phi, t):
+    rr = copy.deepcopy(nucData.xs)
 
     rr['fission'] = 0
     rr['(n,gamma)'] = 0
@@ -172,7 +172,7 @@ def rr(sig, psi, Phi, t):
 
             for jj in range(len(reaz)-1):
 
-                rr[reaz[jj]] += np.inner(np.array(sig[MT[jj]][j][t]) * where[i], psi[i][j]) * Phi
+                rr[reaz[jj]] += np.inner(np.array(sigma[MT[jj]][j][t]) * where[i], psi[i][j]) * Phi
 
     return rr
 
@@ -371,64 +371,59 @@ def beta2(Gh, lam, N, t):
     return np.array(BETA)
 
 
-def betaSig(Psi, lam, pert, N, G, t):
+def betaSig(Psi, lam, pert, N, G, id, t):
 
+    M = N.copy()
     BETA = []
-    N[-1] = 0
-    isotope = nucData.ZAI.index('922350')
+    M[-1] = 0
 
     for e in range(ene):
 
         XS = copy.deepcopy(nucData.xs)
-        XS[pert][e][nucData.nodo][isotope]=1
+        XS[pert][e][t][id]=1
 
-        B = Boltz(N * where, XS, nucData.nodo, lam)
+        B = Boltz(M * where, XS, t, lam)
 
         BETA.append(tramezzino(Psi,G,B))
 
     return np.array(BETA)
 
-def bateSig(Psi, Phi, pert, N, Ns, t):
-
+def bateSig(Psi, Phi, pert, N, Ns, id, t, dt):
 
     BATE = []
-    N[-1] = 0
-    isotope = nucData.ZAI.index('922350')
-    psi = reshapePsi(Psi)
-
+    PSI = reshapePsi(Psi)
 
     for e in range(ene):
 
         XS = copy.deepcopy(nucData.xs)
-        XS[pert][e][nucData.nodo][isotope]=1
+        XS[pert][e][t][id]=1
 
-        r = rr(XS,psi,Phi,t)
-        PL = updatePL(pl,r)
+        RR = rr(XS,PSI,Phi,t)
+        PL = updatePL(pl,RR)
 
         R = onixR(PL)
 
-        BATE.append(tramezzino(N,Ns,R))
+        BATE.append(I(N,Ns,R, dt))
 
     return np.array(BATE)
 
-def PiSig(Psi, Phi, pert, N, t):
-
+def PiSig(Psi, Phi, pert, N, id, t):
 
     PI = []
-    N[-1] = 0
-    isotope = nucData.ZAI.index('922350')
-    psi = reshapePsi(Psi)
+    PSI = reshapePsi(Psi)
 
     for e in range(ene):
 
         XS = copy.deepcopy(nucData.xs)
-        XS[pert][e][nucData.nodo][isotope]=1
+        XS[pert][e][t][id]=1
 
-        r = rr(XS,psi,Phi,t)
+        RR = rr(XS,PSI,Phi,t)
 
-        PI.append(r['fission'][isotope]*sig['v'][isotope]*N[isotope])
+        PI.append(RR['fission'][id]*sig['v'][id]*N[id])
 
     return np.array(PI)
+
+
 
 def dR(Psi, Gh, N, k, t):
 

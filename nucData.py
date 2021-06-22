@@ -9,7 +9,7 @@ from periodictable import elements
 ### STECHIO ###
 ###############
 
-file = 'PWR'
+file = 'gatti'
 res = ST.read(file + '/REP_res.m')
 dep = ST.read(file + '/REP_dep.m')
 time =  dep.days
@@ -17,10 +17,8 @@ giorni = dep.days[-1]
 T = dep.days[-1]*24*3600
 MXT=ST.MicroXSTuple
 
-#tempo = np.linspace(0,5,20).tolist() + np.linspace(5,100,30).tolist()[1:] + np.linspace(100,giorni,50).tolist()[1:]
 #tempo = np.linspace(0,5,10).tolist() + np.linspace(5,100,15).tolist()[1:] + np.linspace(100,giorni,25).tolist()[1:]
 tempo = np.linspace(0,5,5).tolist() + np.linspace(5,100,10).tolist()[1:] + np.linspace(100,giorni,10).tolist()[1:]
-#tempo = np.linspace(0,giorni, 500).tolist()
 
 steps = len(tempo)
 nodo = int(len(dep.days)/2)
