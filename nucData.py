@@ -4,6 +4,7 @@ import math
 import serpentTools as ST
 from serpentTools.settings import rc
 from periodictable import elements
+import matplotlib.pyplot as plt
 
 ###############
 ### STECHIO ###
@@ -551,6 +552,25 @@ for key in xs.keys():
     xs[key] = np.zeros((ene,steps,len(At)))
 
 
+def xsPlot(sigma, MT, zai, t):
 
+    x = grid[:-1]
+    id= ZAI.index(zai)
+    name = nuc[id].name
+    fig, axs = plt.subplots()
+
+    y = [sigma[MT][e][t][id]*1E+24/x[e] for e in range(ene)]
+    axs.step(x, y, where = 'pre')
+    tit = name+ ' MT '+MT+' cross section\n'
+    axs.set(xlabel='Energy [MeV]', ylabel='cross section [barn/MeV]', title=tit)
+
+    axs.set_yscale('log')
+    axs.set_xscale('log')
+
+    fig.savefig(zai+'_'+MT+'_xs.png')
+
+#xsPlot(sig,'102','922380',nodo)
+#xsPlot(sig,'18','922350',nodo)
+#xsPlot(sig,'102','922350',nodo)
 
 

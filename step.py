@@ -25,11 +25,8 @@ plt.rcParams.update({'figure.max_open_warning': 60})
 ##################
 
 ZAI = nucData.ZAI
-
 zeroAt = nucData.At
-
 sig = nucData.sig
-
 ene = nucData.ene
 reg = 3
 
@@ -42,11 +39,8 @@ square= '\u00b2'
 ### depletion init ###
 
 P = 1.55E+2   # J/fiss
-
 T = nucData.T
-
 n = nucData.steps
-
 s = 1000
 
 #####################
@@ -646,7 +640,6 @@ def adjoStep(res, **kwargs):
 
             S = [S[e] + (Bate_sig[e] + Beta_sig[e] + Pi_sig[e])*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
 
-
             ind_1= [ind_1[e] + Beta_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
             ind_2= [ind_2[e] + Pi_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
             dir_1= [dir_1[e] + Bate_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
@@ -965,7 +958,7 @@ def fluxSnap(flux, name, UM, **kwargs):
 
     therm=[phi*flux[j] for j in range(len(flux))]
 
-    axs.plot(x, therm, 'b', label='SIBYL')
+    axs.step(x, therm, 'b', where='pre', label='SIBYL')
     #axs.set_xlim(0, ene)
     axs.set(xlabel='Energy [MeV]', ylabel=name + ' [' + UM +']', title='Flux spectrum')
 
@@ -975,9 +968,9 @@ def fluxSnap(flux, name, UM, **kwargs):
 
         therm = [flux[j] for j in range(len(flux))]
 
-        axs.plot(x, therm, 'r', label='SERPENT')
+        axs.step(x, therm, 'r', where='pre', label='SERPENT')
 
-    axs.set_yscale('log')
+    #axs.set_yscale('log')
     axs.set_xscale('log')
     axs.legend(loc='upper right')
 
@@ -1002,7 +995,7 @@ def bunSnap(resu, name, xs):
         tit = 'EOL '+nucData.nuc[respId].name+' Sensitivity to '+nucData.nuc[PERTid].name+' '+xs+' cross section\n'
         axs.set(xlabel='Energy [MeV]', ylabel='sensitivity', title=tit)
 
-        #axs.set_yscale('symlog')
+        #axs.set_yscale('log')
         axs.set_xscale('log')
         axs.legend(loc='best')
 
