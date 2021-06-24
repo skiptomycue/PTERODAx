@@ -142,6 +142,25 @@ def Boltz(N, sigma, t, lam):
 
     return A
 
+def ribalta(LL):
+
+    forma1 = (ene, ene, reg, reg)
+    forma2 = (reg, reg, ene, ene)
+    L = LL.reshape(forma1)
+    P = np.zeros(forma2)
+
+    for a in range(forma1[0]):
+        for b in range(forma1[1]):
+            for c in range(forma1[2]):
+                for d in range(forma1[3]):
+
+                    P[c,d,a,b]=L[a,b,c,d]
+
+    mtx = np.vstack(np.dstack(np.array(P)))
+
+    return mtx
+
+
 ### UPDATE MACRO XS ###
 
 def reshapePsi(Psi):
@@ -601,8 +620,13 @@ def getMM(zai):
 def plotBU(A, name):
 
     C=abs(A)
-    plt.imshow(C, cmap='Reds',  norm=LogNorm(vmin=1E-10, vmax=1E-3))
-    plt.colorbar(orientation='vertical')
-    plt.savefig(name+'.png')
+
+    fig, axs = plt.subplots()
+
+    im = axs.imshow(C, cmap='Reds',  norm=LogNorm(vmin=1E-4, vmax=1E+1))
+    fig.colorbar(im, orientation='vertical')
+
+    fig.savefig(name+'.png')
+
 
     return

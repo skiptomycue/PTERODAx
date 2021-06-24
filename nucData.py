@@ -567,9 +567,10 @@ def xsPlot(sigma, MT, zai, t):
     axs.set_yscale('log')
     axs.set_xscale('log')
 
-    fig.savefig(zai+'_'+MT+'_xs.png')
+    fig.savefig('xs/'+zai+'_'+MT+'_xs.png')
 
 #xsPlot(sig,'102','922380',nodo)
+#xsPlot(sig,'103','922380',nodo)
 #xsPlot(sig,'18','922350',nodo)
 #xsPlot(sig,'102','922350',nodo)
 

@@ -1,10 +1,11 @@
+from datetime import datetime
+import copy
 import numpy as np
 from scipy.integrate import odeint
 import scipy
 import fun
 import nucData
 import matplotlib.pyplot as plt
-from datetime import datetime
 import sys
 import os
 import math
@@ -51,14 +52,14 @@ PERT = ['922350']
 respId = nucData.ZAI.index('942390')
 pert = 1.01
 PERTid = nucData.ZAI.index(PERT[0])
-MT = '18'
-reac = 'fission'
+MT = '102'
+reac = fun.reaz[fun.MT.index(MT)]
 
 ##############
 ### DEFINE ###
 ##############
 
-def zeroStep(At):
+def zeroStep(At, sig):
 
     res = fun.Results()
 
@@ -71,6 +72,8 @@ def zeroStep(At):
     print(k)
 
     A = fun.Boltz(N, sig, 0, 1 / k)
+
+    #fun.plotBU(np.matrix(fun.ribalta(A)), 'Regions_mtx')
 
     A[1] = np.ones(ene*reg)
 
@@ -92,9 +95,6 @@ def zeroStep(At):
 
     C = fun.Bateman(rr)
 
-    #fun.plotBU(np.matrix(A), 'Transport_mtx')
-    #fun.plotBU(np.matrix(C), 'Depletion_mtx')
-
     # results
 
     res.flux.append(Psi)
@@ -107,9 +107,9 @@ def zeroStep(At):
 
     return res
 
-def directStep(At):
+def directStep(At, sig):
 
-    res = zeroStep(At)
+    res = zeroStep(At,sig)
 
     res.comp.append(At)
 
@@ -236,34 +236,63 @@ def printRes(res, **kwargs):
                 j = j + 1
                 # printRes(pertRes, keff=True, comp = False, phi = False, flux = False)
 
-def pertBlock(res):
+def pertBlock(res, **kwargs):
 
     j = 0
 
     res.pert['atoms'] = []
     res.pert['keff'] = []
 
-    for z in PERT:
-        zeroAt = nucData.At.copy()
+    spettro = kwargs['spectrum']
 
-        pertId = nucData.ZAI.index(z)
+    if spettro == False:
 
-        print('\n\nPerturbed calculation ' + str(j + 1) + ' (' + nucData.ZAI[pertId] + ')\n')
+        for z in PERT:
+            zeroAt = nucData.At.copy()
 
-        Bdir = zeroAt[pertId]
-        Bper = zeroAt[pertId] * pert
+            pertId = nucData.ZAI.index(z)
 
-        zeroAt[pertId] = Bper
+            print('\n\nPerturbed calculation ' + str(j + 1) + ' (' + nucData.ZAI[pertId] + ')\n')
 
-        pertRes = directStep(zeroAt)
+            Bdir = zeroAt[pertId]
+            Bper = zeroAt[pertId] * pert
 
-        Npert = pertRes.comp[-1]
-        No = res.comp[-1]
-        res.pert['atoms'].append(Npert[respId] - No[respId])
-        res.pert['keff'].append((pertRes.keff[-1] - res.keff[-1]))
+            zeroAt[pertId] = Bper
 
-        j = j + 1
-        # printRes(pertRes, keff=True, comp = False, phi = False, flux = False)
+            pertRes = directStep(zeroAt)
+
+            Npert = pertRes.comp[-1]
+            No = res.comp[-1]
+            res.pert['atoms'].append(Npert[respId] - No[respId])
+            res.pert['keff'].append((pertRes.keff[-1] - res.keff[-1]))
+
+            j = j + 1
+            # printRes(pertRes, keff=True, comp = False, phi = False, flux = False)
+
+    elif spettro == True:
+
+        for e in range(ene):
+
+            zeroAt = nucData.At.copy()
+            pertId = PERTid
+
+            print('\n\nPerturbed calculation ' + str(j + 1) + '/'+str(ene)+' (' + nucData.ZAI[pertId] + ')\n')
+
+            sigma = copy.deepcopy(sig)
+
+            for t in range(nucData.steps):
+
+                sigma[MT][e][t][pertId] = sigma[MT][e][t][pertId] * pert
+                sigma['removal'][e][t][pertId] += sigma[MT][e][t][pertId] * (pert-1)
+
+            pertRes = directStep(zeroAt, sigma)
+
+            Npert = pertRes.comp[-1]
+            No = res.comp[-1]
+            res.pert['atoms'].append(Npert[respId] - No[respId])
+            res.pert['keff'].append((pertRes.keff[-1] - res.keff[-1]))
+
+            j = j + 1
 
 def adjoStep(res, **kwargs):
 
@@ -628,13 +657,13 @@ def adjoStep(res, **kwargs):
 
             Ns = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
 
-            SS=Ns1.copy()
-
             # SENSITIVITY
 
             Beta_sig = fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)*Phi
             Bate_sig = fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns,SS], PERTid, v, dt)
-            Pi_sig   = fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Phi
+            Pi_sig   = -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Phi
+
+            SS=Ns1.copy()
 
             # *sig['18'][e][v][PERTid]/RESP
 
@@ -952,11 +981,11 @@ def fluxSnap(flux, name, UM, **kwargs):
         phi=np.ones(len(flux))
         #flux.append(flux[-1])
 
-    x = nucData.grid[:-1]
+    x = nucData.grid
 
     fig, axs = plt.subplots()
 
-    therm=[phi*flux[j] for j in range(len(flux))]
+    therm=[phi*flux[j] for j in range(len(flux))] + [0]
 
     axs.step(x, therm, 'b', where='pre', label='SIBYL')
     #axs.set_xlim(0, ene)
@@ -966,19 +995,20 @@ def fluxSnap(flux, name, UM, **kwargs):
 
         flux = kwargs['serp']
 
-        therm = [flux[j] for j in range(len(flux))]
+        therm = [flux[j] for j in range(len(flux))] + [0]
 
         axs.step(x, therm, 'r', where='pre', label='SERPENT')
 
     #axs.set_yscale('log')
     axs.set_xscale('log')
     axs.legend(loc='upper right')
+    axs.set_xlim(1E-9, 1E+1)
 
     fig.savefig('flux/' + name + '_snap.png')
 
-def bunSnap(resu, name, xs):
+def bunSnap(resu, res, name, xs):
 
-    x = nucData.grid[:-1]
+    x = nucData.grid
 
     fig, axs = plt.subplots()
 
@@ -990,16 +1020,20 @@ def bunSnap(resu, name, xs):
 
     for flux in resu:
 
-        y = flux
+        y = flux + [0]
         axs.step(x, y, col[j], linestyle= lin[j], where = 'pre', label=lab[j])
         tit = 'EOL '+nucData.nuc[respId].name+' Sensitivity to '+nucData.nuc[PERTid].name+' '+xs+' cross section\n'
         axs.set(xlabel='Energy [MeV]', ylabel='sensitivity', title=tit)
-
         #axs.set_yscale('log')
         axs.set_xscale('log')
-        axs.legend(loc='best')
 
         j+=1
+
+    RESP = res.comp[-1][respId]
+    y2 = [res.pert['atoms'][e]/RESP/(1-pert) for e in range(ene)] + [0]
+    axs.step(x, y2, 'red', linestyle=lin[-1], where='pre', label='SIBYL')
+    axs.legend(loc='best')
+    axs.set_xlim(1E-9, 1E+1)
 
     fig.savefig('flux/sensitivity_to_'+name+'_snap.png')
 
@@ -1017,7 +1051,7 @@ def main(**kwargs):
 
     print('\nNominal calculation\n')
 
-    res=directStep(zeroAt)
+    res=directStep(zeroAt, sig)
 
     printRes(res, keff=True, comp = False, phi = False, flux = False)
 
@@ -1035,7 +1069,7 @@ def main(**kwargs):
 
         ### perturbed solution ###
 
-        pertBlock(res)
+        pertBlock(res, spectrum=True)
 
         ### adjoint solution ###
 
@@ -1064,7 +1098,7 @@ def main(**kwargs):
 
         flu = adjoRes
 
-        bunSnap(adjoRes.ind[0], PERT[0], reac)
+        bunSnap(adjoRes.ind[0], res, PERT[0], reac)
 
         #fluxPlot(flu.flux, 'Adjoint Flux', '')
         #fluxPlot(flu.source, 'Adjoint Source', '')
