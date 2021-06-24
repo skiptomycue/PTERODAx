@@ -45,7 +45,7 @@ class Results:
 
 ### transport matrix ###
 
-def buildFiss(N, sigma, t):
+def buildFiss(N, sigma, t, **kwargs):
 
     reg = 3
 
@@ -58,9 +58,13 @@ def buildFiss(N, sigma, t):
 
     mtx = np.vstack(np.dstack(np.array(F)))
 
+    if 'ribalta' in kwargs.keys() :
+        if kwargs['ribalta'] == True:
+            mtx = ribalta(np.array(F))
+
     return mtx
 
-def buildPozz(N, sigma, t):
+def buildPozz(N, sigma, t, **kwargs):
 
     reg = 3
 
@@ -72,9 +76,13 @@ def buildPozz(N, sigma, t):
 
     mtx = np.vstack(np.dstack(np.array(A)))
 
+    if 'ribalta' in kwargs.keys() :
+        if kwargs['ribalta'] == True:
+            mtx = ribalta(np.array(A))
+
     return mtx
 
-def buildTrasp(Albe, t):
+def buildTrasp(Albe, t, **kwargs):
 
     reg = 3
 
@@ -84,12 +92,15 @@ def buildTrasp(Albe, t):
 
         mtx [i][i] = Albe[t][i]
 
-
     Trasp = np.vstack(np.dstack(np.array(mtx)))
+
+    if 'ribalta' in kwargs.keys() :
+        if kwargs['ribalta'] == True:
+            Trasp = ribalta(np.array(mtx))
 
     return Trasp
 
-def buildSca(scatt):
+def buildSca(scatt, **kwargs):
 
     scaFuel = scatt[0]
     scaClad = scatt[1]
@@ -113,17 +124,23 @@ def buildSca(scatt):
 
                 lista[-1] += np.diag([pozzoFuel, pozzoClad, pozzoCool])
 
-    sca = np.vstack(np.dstack(np.array(lista).reshape(ene,ene,reg,reg)))
+    A = np.array(lista).reshape(ene,ene,reg,reg)
+
+    sca = np.vstack(np.dstack(A))
+
+    if 'ribalta' in kwargs.keys() :
+        if kwargs['ribalta'] == True:
+            sca = ribalta(A)
 
     return sca
 
-def boltzL(N, sigma, t):
+def boltzL(N, sigma, t, **kwargs):
 
-    S = buildSca(nucData.scatt)
+    S = buildSca(nucData.scatt, **kwargs)
 
-    T = buildTrasp(nucData.Albe, t)
+    T = buildTrasp(nucData.Albe, t, **kwargs)
 
-    A = buildPozz(N, sigma, t)
+    A = buildPozz(N, sigma, t, **kwargs)
 
     if N.ravel()[-1] == 0:
         S=S*0
@@ -131,14 +148,14 @@ def boltzL(N, sigma, t):
 
     return A+S+T
 
-def boltzF(N, sigma, t):
+def boltzF(N, sigma, t, **kwargs):
 
-    F = buildFiss(N, sigma, t)
+    F = buildFiss(N, sigma, t, **kwargs)
 
     return F
 
-def Boltz(N, sigma, t, lam):
-    A = boltzL(N, sigma, t) - lam * boltzF(N, sigma, t)
+def Boltz(N, sigma, t, lam, **kwargs):
+    A = boltzL(N, sigma, t, **kwargs) - lam * boltzF(N, sigma, t, **kwargs)
 
     return A
 
@@ -146,7 +163,7 @@ def ribalta(LL):
 
     forma1 = (ene, ene, reg, reg)
     forma2 = (reg, reg, ene, ene)
-    L = LL.reshape(forma1)
+    L = LL.copy()
     P = np.zeros(forma2)
 
     for a in range(forma1[0]):

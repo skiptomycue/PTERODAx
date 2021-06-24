@@ -71,9 +71,12 @@ def zeroStep(At, sig):
     #k=fun.findK(N, 0)
     print(k)
 
-    A = fun.Boltz(N, sig, 0, 1 / k)
+    A  = fun.Boltz(N, sig, 0, 1 / k)
+    AA = fun.Boltz(N, sig, 0, 1 / k, ribalta=True)
 
-    #fun.plotBU(np.matrix(fun.ribalta(A)), 'Regions_mtx')
+
+    fun.plotBU(np.matrix(AA), 'Regions_mtx')
+    fun.plotBU(np.matrix(A), 'Transport_mtx')
 
     A[1] = np.ones(ene*reg)
 
