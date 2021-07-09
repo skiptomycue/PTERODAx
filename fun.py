@@ -437,7 +437,7 @@ def bateSig(Psi, Phi, pert, N, Ns, id, t, dt):
         RR = rr(XS,PSI,Phi,t)
         PL = updatePL(pl,RR)
 
-        R = onixR(PL)
+        R = Bateman(RR)
 
         BATE.append(I(N,Ns,R, dt))
 
