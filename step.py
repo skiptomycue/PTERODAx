@@ -48,9 +48,9 @@ s = 1000
 ### PERTURBATION  ###
 #####################88
 
-PERT = ['922350']
+PERT = ['922380']
 respId = nucData.ZAI.index('942390')
-pert = 1.01
+pert = 1.001
 PERTid = nucData.ZAI.index(PERT[0])
 MT = '102'
 reac = fun.reaz[fun.MT.index(MT)]
@@ -75,8 +75,8 @@ def zeroStep(At, sig):
     AA = fun.Boltz(N, sig, 0, 1 / k, ribalta=True)
 
 
-    fun.plotBU(np.matrix(AA), 'Regions_mtx')
-    fun.plotBU(np.matrix(A), 'Transport_mtx')
+    #fun.plotBU(np.matrix(AA), 'Regions_mtx')
+    #fun.plotBU(np.matrix(A), 'Transport_mtx')
 
     A[1] = np.ones(ene*reg)
 
@@ -262,7 +262,7 @@ def pertBlock(res, **kwargs):
 
             zeroAt[pertId] = Bper
 
-            pertRes = directStep(zeroAt)
+            pertRes = directStep(zeroAt, sig)
 
             Npert = pertRes.comp[-1]
             No = res.comp[-1]
@@ -312,12 +312,14 @@ def adjoStep(res, **kwargs):
     dir_1=np.zeros(len(res.comp[0])).tolist()
 
     S = np.zeros(ene).tolist()
+    Ns1 = Ns.copy()
 
     if 'respId' in kwargs.keys() and 'xs' not in kwargs.keys():
         respId = kwargs['respId']
 
         Ns[respId] = 1
-        Nss = Ns
+        Nss = Ns.copy()
+        Ns1 = Ns.copy()
 
         SS=Ns.copy()
 
@@ -361,6 +363,8 @@ def adjoStep(res, **kwargs):
             adjoRes.ind.append([ind_2,dir_1,ind_1, Ns])
 
             dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
+
+            SS=Ns1.copy()
 
             old_stdout = sys.stdout  # backup current stdout
             sys.stdout = open(os.devnull, "w")
@@ -412,8 +416,6 @@ def adjoStep(res, **kwargs):
             dir_1= [dir_1[j] + Ns1[j]-Ns[j] for j in range(Beta.shape[0])]
 
             Ns = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
-
-            SS=Ns1.copy()
 
             print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
             sys.stdout.flush()
@@ -612,6 +614,8 @@ def adjoStep(res, **kwargs):
 
             dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
 
+            SS=Ns1.copy()
+
             old_stdout = sys.stdout  # backup current stdout
             sys.stdout = open(os.devnull, "w")
             #Ns1 = odeint(fun.ODE2b, Ns, time, C).tolist()[::-1]
@@ -621,7 +625,7 @@ def adjoStep(res, **kwargs):
             # adjoint power normalization
 
             PL=fun.updatePL(fun.pl, rr)
-            R=fun.onixR(PL)
+            R=fun.Bateman(rr)
             Ps=fun.I([No,N],[Ns1,SS],R, dt)/P
 
             adjoRes.pow.append(Ps)
@@ -655,7 +659,6 @@ def adjoStep(res, **kwargs):
 
             Beta = fun.beta(Psi, lam, No, v)
 
-
             Pi = rr['fission'].copy()*sig['v']
 
             Ns = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
@@ -663,18 +666,16 @@ def adjoStep(res, **kwargs):
             # SENSITIVITY
 
             Beta_sig = fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)*Phi
-            Bate_sig = fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns,SS], PERTid, v, dt)
-            Pi_sig   = -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Phi
-
-            SS=Ns1.copy()
+            Bate_sig = fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
+            Pi_sig   = -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Ps
 
             # *sig['18'][e][v][PERTid]/RESP
 
-            S = [S[e] + (Bate_sig[e] + Beta_sig[e] + Pi_sig[e])*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
+            S = [S[e] + (Bate_sig[e] + Beta_sig[e] + Pi_sig[e])*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
 
-            ind_1= [ind_1[e] + Beta_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
-            ind_2= [ind_2[e] + Pi_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
-            dir_1= [dir_1[e] + Bate_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
+            ind_1= [ind_1[e] + Beta_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+            ind_2= [ind_2[e] + Pi_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+            dir_1= [dir_1[e] + Bate_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
 
             print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
             sys.stdout.flush()
@@ -865,6 +866,7 @@ def adjoPlot(res, adjoRes, **kwargs):
 
         if z in PERT:
             kk = PERT.index(z)
+            print(kk)
             y = np.ones(len(x)) * sibyl[kk] * c
             ax1.plot(x, y, 'r--', markersize=15, label='pert')
             ax1.vlines(0, np.array(adjoRes.ind).transpose()[k][-1][0]*nn*c, y[0], linewidth=10, label='error')
@@ -1033,7 +1035,8 @@ def bunSnap(resu, res, name, xs):
         j+=1
 
     RESP = res.comp[-1][respId]
-    y2 = [res.pert['atoms'][e]/RESP/(1-pert) for e in range(ene)] + [0]
+    #y2 = [res.pert['atoms'][e]/RESP/(pert-1) for e in range(ene)] + [0]
+    y2 = [res.pert['atoms'][e]/(sig[MT][e][nodo][PERTid]*(pert-1)) for e in range(ene)] + [0]
     axs.step(x, y2, 'red', linestyle=lin[-1], where='pre', label='SIBYL')
     axs.legend(loc='best')
     axs.set_xlim(1E-9, 1E+1)
@@ -1072,7 +1075,7 @@ def main(**kwargs):
 
         ### perturbed solution ###
 
-        pertBlock(res, spectrum=True)
+        pertBlock(res, spectrum=kwargs['spectrum'])
 
         ### adjoint solution ###
 
@@ -1101,7 +1104,7 @@ def main(**kwargs):
 
         flu = adjoRes
 
-        bunSnap(adjoRes.ind[0], res, PERT[0], reac)
+        #bunSnap(adjoRes.ind[0], res, PERT[0], reac)
 
         #fluxPlot(flu.flux, 'Adjoint Flux', '')
         #fluxPlot(flu.source, 'Adjoint Source', '')
@@ -1110,7 +1113,7 @@ def main(**kwargs):
         #adjoPlot(res, adjoRes, respId = respId)
         #adjoPlot(res, resKeff, resp='keff')
 
-main(ptero=True)
+main(ptero=True, spectrum=True)
 
 ### chrono ###
 

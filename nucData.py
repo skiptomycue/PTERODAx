@@ -18,8 +18,8 @@ giorni = dep.days[-1]
 T = dep.days[-1]*24*3600
 MXT=ST.MicroXSTuple
 
-#tempo = np.linspace(0,5,10).tolist() + np.linspace(5,100,15).tolist()[1:] + np.linspace(100,giorni,25).tolist()[1:]
-tempo = np.linspace(0,5,5).tolist() + np.linspace(5,100,10).tolist()[1:] + np.linspace(100,giorni,10).tolist()[1:]
+tempo = np.linspace(0,5,10).tolist() + np.linspace(5,100,15).tolist()[1:] + np.linspace(100,giorni,25).tolist()[1:]
+#tempo = np.linspace(0,5,5).tolist() + np.linspace(5,100,10).tolist()[1:] + np.linspace(100,giorni,10).tolist()[1:]
 
 steps = len(tempo)
 nodo = int(len(dep.days)/2)
