@@ -52,7 +52,7 @@ PERT = ['922350']
 respId = nucData.ZAI.index('942390')
 pert = 1.01
 PERTid = nucData.ZAI.index(PERT[0])
-MT = '102'
+MT = '18'
 reac = fun.reaz[fun.MT.index(MT)]
 
 ##############
@@ -75,8 +75,8 @@ def zeroStep(At, sig):
     AA = fun.Boltz(N, sig, 0, 1 / k, ribalta=True)
 
 
-    fun.plotBU(np.matrix(AA), 'Regions_mtx')
-    fun.plotBU(np.matrix(A), 'Transport_mtx')
+    #fun.plotBU(np.matrix(AA), 'Regions_mtx')
+    #fun.plotBU(np.matrix(A), 'Transport_mtx')
 
     A[1] = np.ones(ene*reg)
 
@@ -663,10 +663,8 @@ def adjoStep(res, **kwargs):
             # SENSITIVITY
 
             Beta_sig = fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)*Phi
-            Bate_sig = fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns,SS], PERTid, v, dt)
-            Pi_sig   = -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Phi
-
-            SS=Ns1.copy()
+            Bate_sig = fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
+            Pi_sig   = fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Phi*2
 
             # *sig['18'][e][v][PERTid]/RESP
 
@@ -675,6 +673,8 @@ def adjoStep(res, **kwargs):
             ind_1= [ind_1[e] + Beta_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
             ind_2= [ind_2[e] + Pi_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
             dir_1= [dir_1[e] + Bate_sig[e]*sig[xs_pert][e][v][PERTid]/RESP for e in range(ene)]
+
+            SS=Ns1.copy()
 
             print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
             sys.stdout.flush()
@@ -1033,7 +1033,7 @@ def bunSnap(resu, res, name, xs):
         j+=1
 
     RESP = res.comp[-1][respId]
-    y2 = [res.pert['atoms'][e]/RESP/(1-pert) for e in range(ene)] + [0]
+    y2 = [res.pert['atoms'][e]/RESP/(pert-1) for e in range(ene)] + [0]
     axs.step(x, y2, 'red', linestyle=lin[-1], where='pre', label='SIBYL')
     axs.legend(loc='best')
     axs.set_xlim(1E-9, 1E+1)
