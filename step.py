@@ -48,12 +48,17 @@ s = 1000
 ### PERTURBATION  ###
 #####################88
 
-PERT = ['922380']
-respId = nucData.ZAI.index('942390')
-pert = 1.001
+PERT     = ['922350', '922380']                                     # INPUT PERTURBATION NUCLIDE
+MT       =  '102'                                                   # INPUT PERTURBATION XS
+RESP_NUC =  '942390'                                                # OUTPUT RESPONSE NUCLIDE
+RESPONSE =  'keff'                                                  # OUTPUT NUCLIDE OR KEFF
+ND       =  False                                                   # SWITCH ND PERTURBATION
+
+
+pert = 1.01
 PERTid = nucData.ZAI.index(PERT[0])
-MT = '102'
 reac = fun.reaz[fun.MT.index(MT)]
+respId = nucData.ZAI.index(RESP_NUC)
 
 ##############
 ### DEFINE ###
@@ -183,62 +188,6 @@ def directStep(At, sig):
 
     return res
 
-def printRes(res, **kwargs):
-
-    print('\n\nResults')
-
-    for key,value in kwargs.items():
-
-        if value == True:
-
-            print('\n' + key)
-
-            try:
-
-                getattr(res, key)[0][0][1]
-
-            except:
-
-                #print('%.5f' % getattr(res, key)[0])
-                #print('%.5f' % getattr(res, key)[-1])
-                print(getattr(res, key)[0])
-                print(getattr(res, key)[-1])
-
-
-            else:
-
-                print(getattr(res, key)[0][0])
-                print(getattr(res, key)[-1][-1])
-
-        def pertBlock():
-
-            j = 0
-
-            res.pert['atoms'] = []
-            res.pert['keff'] = []
-
-            for z in PERT:
-                zeroAt = nucData.At.copy()
-
-                pertId = nucData.ZAI.index(z)
-
-                print('\n\nPerturbed calculation ' + str(j + 1) + ' (' + nucData.ZAI[pertId] + ')\n')
-
-                Bdir = zeroAt[pertId]
-                Bper = zeroAt[pertId] * pert
-
-                zeroAt[pertId] = Bper
-
-                pertRes = directStep(zeroAt)
-
-                Npert = pertRes.comp[-1]
-                No = res.comp[-1]
-                res.pert['atoms'].append(Npert[respId] - No[respId])
-                res.pert['keff'].append((pertRes.keff[-1] - res.keff[-1]))
-
-                j = j + 1
-                # printRes(pertRes, keff=True, comp = False, phi = False, flux = False)
-
 def pertBlock(res, **kwargs):
 
     j = 0
@@ -246,9 +195,9 @@ def pertBlock(res, **kwargs):
     res.pert['atoms'] = []
     res.pert['keff'] = []
 
-    spettro = kwargs['spectrum']
+    ND = kwargs['ND']
 
-    if spettro == False:
+    if ND == False:
 
         for z in PERT:
             zeroAt = nucData.At.copy()
@@ -272,7 +221,7 @@ def pertBlock(res, **kwargs):
             j = j + 1
             # printRes(pertRes, keff=True, comp = False, phi = False, flux = False)
 
-    elif spettro == True:
+    elif ND == True:
 
         for e in range(ene):
 
@@ -305,6 +254,7 @@ def adjoStep(res, **kwargs):
     adjoRes.flux.append(np.zeros(len(res.flux[0].tolist())).tolist())
 
     Ns = np.zeros(len(res.comp[0]))
+    Ns1 = Ns.copy()
 
     sk=np.zeros(len(res.comp[0])).tolist()
     ind_1=np.zeros(len(res.comp[0])).tolist()
@@ -312,117 +262,10 @@ def adjoStep(res, **kwargs):
     dir_1=np.zeros(len(res.comp[0])).tolist()
 
     S = np.zeros(ene).tolist()
-    Ns1 = Ns.copy()
 
-    if 'respId' in kwargs.keys() and 'xs' not in kwargs.keys():
-        respId = kwargs['respId']
+    resp = kwargs['resp']
 
-        Ns[respId] = 1
-        Nss = Ns.copy()
-        Ns1 = Ns.copy()
-
-        SS=Ns.copy()
-
-        for i in range(n-1):
-
-            v = -2-i
-
-            Psi = res.flux[v]
-
-            Phi = float(res.phi[v])
-
-            C = res.M[v]
-
-            k = res.keff[v]
-
-            N = res.comp[v+1]
-            No = res.comp[v]
-
-            psi = fun.reshapePsi(Psi)
-
-            rr = fun.rr(fun.sig, psi, Phi,v)
-
-            # homogeneous adjoint
-
-            A = fun.Boltz(No * where, sig, v, 1/k).transpose()
-
-            A[1] = Psi
-
-            B = np.zeros(len(A[0])).tolist()
-
-            B[1] = 1
-
-            Gh = np.linalg.inv(A).dot(B)
-
-            adjoRes.homo.append(Gh)
-
-            # keff sens
-
-            adjoRes.comp.append(Ns)
-
-            adjoRes.ind.append([ind_2,dir_1,ind_1, Ns])
-
-            dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
-
-            SS=Ns1.copy()
-
-            old_stdout = sys.stdout  # backup current stdout
-            sys.stdout = open(os.devnull, "w")
-            #Ns1 = odeint(fun.ODE2b, Ns, time, C).tolist()[::-1]
-            Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose()*(dt), np.array(Ns))
-            sys.stdout = old_stdout  # reset old stdout
-
-            # adjoint power normalization
-
-            PL=fun.updatePL(fun.pl, rr)
-            R=fun.onixR(PL)
-            Ps=fun.I([No,N],[Ns1,SS],R, dt)/P
-
-            adjoRes.pow.append(Ps)
-
-            # adjoint source
-
-            B = -np.array(fun.Qs([No,N],[Ns1,SS], Ps, Phi, v, dt))
-
-            adjoRes.source.append(np.array(B))
-
-            # adjoflux-shape algebra
-
-            A = fun.Boltz(No * where, sig, v, 1/k).transpose()
-
-            A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
-            #A[1]=Gh
-
-            B[1]=0
-
-            Gp = np.linalg.inv(A).dot(np.array(B))
-
-            b = (fun.boltzF(No*where, sig, v).dot(Psi).dot(Gp))/(fun.boltzF(No*where, sig, v).dot(Psi).dot(Gh))
-
-            G = Gp - b*Gh*0
-
-            adjoRes.flux.append(G)
-
-            # step condition
-
-            lam = 1 / k
-
-            Beta = fun.beta(Psi, lam, No, v)
-
-            Pi = rr['fission'].copy()*sig['v']
-
-            ind_1= [ind_1[j] + np.inner(G, Beta[j]) for j in range(Beta.shape[0])]
-            ind_2= [ind_2[j] - Ps * Pi[j] for j in range(Beta.shape[0])]
-            dir_1= [dir_1[j] + Ns1[j]-Ns[j] for j in range(Beta.shape[0])]
-
-            Ns = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
-
-            print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
-            sys.stdout.flush()
-
-        adjoRes.ind.append([ind_2, dir_1, ind_1, Ns])
-
-    if 'keff' in kwargs.keys():
+    if resp == 'keff':
 
         ind_3 = np.zeros(len(res.comp[0])).tolist()
         SS=Ns.copy()
@@ -488,6 +331,8 @@ def adjoStep(res, **kwargs):
 
             dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
 
+            SS = Ns1.copy()
+
             old_stdout = sys.stdout  # backup current stdout
             sys.stdout = open(os.devnull, "w")
             Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose() * (dt), np.array(Ns))
@@ -496,14 +341,14 @@ def adjoStep(res, **kwargs):
             # adjoint power normalization
 
             PL = fun.updatePL(fun.pl, rr )
-            R = fun.Bateman(rr)-fun.onixD(PL)
-            Ps = (fun.I([No, N], [Ns1, SS], R, dt) + np.inner(dR,Psi)*Phi) / P
+            R = fun.Bateman(rr)#-fun.onixD(PL)
+            Ps = (fun.I([Ns1, SS], [No, N],  R, dt) + ai) / P
 
             adjoRes.pow.append(Ps)
 
             # adjoint source
 
-            B = -dR -np.array(fun.Qs([No, N], [Ns1, SS], Ps, Phi, v, dt)) + ai*Phi*0
+            B = -dR -np.array(fun.Qs([No, N], [Ns1, SS], Ps, Phi, v, dt))
 
             adjoRes.source.append(np.array(B))
 
@@ -532,7 +377,7 @@ def adjoStep(res, **kwargs):
 
             lam = 1 / k
 
-            Beta = fun.beta(Psi, lam, No, v)
+            Beta  = fun.beta(Psi, lam, No, v)
             Beta2 = fun.beta(Gh, lam, No, v)
 
             Pi = rr['fission'].copy()*sig['v']
@@ -542,11 +387,9 @@ def adjoStep(res, **kwargs):
             ind_3 = [ind_3[j] + np.inner(G2, Beta2[j]) for j in range(Beta.shape[0])]
             dir_1 = [dir_1[j] + Ns1[j] - Ns[j] for j in range(Beta.shape[0])]
 
-            # Ns = [Ns1[j] - (np.inner(G, Beta[j]) + (Ps * Pi[j])) + (fun.kSens(Psi, Gh, N, k , j, v)) for j in range(Beta.shape[0])]
+            # Ns = [Ns1[j] - (np.inner(G, Beta[j]) + (Ps * Pi[j])) + (fun.kSens(Gh, Psi,  N, k , j, v)) for j in range(Beta.shape[0])]
 
-            SS = Ns1.copy()
-
-            Ns = [Ns1[j] + (np.inner(G, Beta[j]) - Ps * Pi[j] + np.inner(G2, Beta2[j])) for j in range(Beta.shape[0])]
+            Ns = [Ns1[j] + (np.inner(G, Beta[j]) - Ps * Pi[j]  + np.inner(G2, Beta2[j])) for j in range(Beta.shape[0])]
             Nss = [Ns[j] for j in range(Beta.shape[0])]
 
             # adjoRes.ind.append([ind_2,dir_1,ind_1, sk, Nss])
@@ -556,13 +399,118 @@ def adjoStep(res, **kwargs):
 
         adjoRes.ind.append([ind_2, dir_1, ind_1, ind_3, sk, Ns])
 
-    if 'respId' in kwargs.keys() and 'xs' in kwargs.keys():
+    elif resp == 'nuclide' and 'xs' not in kwargs.keys():
+
+        Ns[respId] = 1
+        Nss = Ns.copy()
+        Ns1 = Ns.copy()
+
+        SS=Ns.copy()
+
+        for i in range(n-1):
+
+            v = -2-i
+
+            Psi = res.flux[v]
+
+            Phi = float(res.phi[v])
+
+            C = res.M[v]
+
+            k = res.keff[v]
+
+            N = res.comp[v+1]
+            No = res.comp[v]
+
+            psi = fun.reshapePsi(Psi)
+
+            rr = fun.rr(fun.sig, psi, Phi,v)
+
+            # homogeneous adjoint
+
+            A = fun.Boltz(No * where, sig, v, 1/k).transpose()
+
+            A[1] = Psi
+
+            B = np.zeros(len(A[0])).tolist()
+
+            B[1] = 1
+
+            Gh = np.linalg.inv(A).dot(B)
+
+            adjoRes.homo.append(Gh)
+
+            # keff sens
+
+            adjoRes.comp.append(Ns)
+
+            adjoRes.ind.append([ind_2,dir_1,ind_1, Ns])
+
+            dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
+
+            SS=Ns1.copy()
+
+            old_stdout = sys.stdout  # backup current stdout
+            sys.stdout = open(os.devnull, "w")
+            #Ns1 = odeint(fun.ODE2b, Ns, time, C).tolist()[::-1]
+            Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose()*(dt), np.array(Ns))
+            sys.stdout = old_stdout  # reset old stdout
+
+            # adjoint power normalization
+
+            PL=fun.updatePL(fun.pl, rr)
+            R=fun.onixR(PL)
+            Ps=fun.I([Ns1,SS],[No,N],R, dt)/P
+
+            adjoRes.pow.append(Ps)
+
+            # adjoint source
+
+            B = -np.array(fun.Qs([No,N],[Ns1,SS], Ps, Phi, v, dt))
+
+            adjoRes.source.append(np.array(B))
+
+            # adjoflux-shape algebra
+
+            A = fun.Boltz(No * where, sig, v, 1/k).transpose()
+
+            A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
+            #A[1]=Gh
+
+            B[1]=0
+
+            Gp = np.linalg.inv(A).dot(np.array(B))
+
+            b = (fun.boltzF(No*where, sig, v).dot(Psi).dot(Gp))/(fun.boltzF(No*where, sig, v).dot(Psi).dot(Gh))
+
+            G = Gp - b*Gh*0
+
+            adjoRes.flux.append(G)
+
+            # step condition
+
+            lam = 1 / k
+
+            Beta = fun.beta(Psi, lam, No, v)
+
+            Pi = rr['fission'].copy()*sig['v']
+
+            ind_1= [ind_1[j] + np.inner(G, Beta[j]) for j in range(Beta.shape[0])]
+            ind_2= [ind_2[j] - Ps * Pi[j] for j in range(Beta.shape[0])]
+            dir_1= [dir_1[j] + Ns1[j]-Ns[j] for j in range(Beta.shape[0])]
+
+            Ns = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
+
+            print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
+            sys.stdout.flush()
+
+        adjoRes.ind.append([ind_2, dir_1, ind_1, Ns])
+
+    elif resp == 'nuclide' and 'xs' in kwargs.keys() :
 
         ind_1 = np.zeros(ene).tolist()
         ind_2 = np.zeros(ene).tolist()
         dir_1 = np.zeros(ene).tolist()
-
-        respId = kwargs['respId']
 
         RESP = res.comp[-1][respId]
 
@@ -626,7 +574,7 @@ def adjoStep(res, **kwargs):
 
             PL=fun.updatePL(fun.pl, rr)
             R=fun.Bateman(rr)
-            Ps=fun.I([No,N],[Ns1,SS],R, dt)/P
+            Ps=fun.I([Ns1,SS],[No,N],R, dt)/P
 
             adjoRes.pow.append(Ps)
 
@@ -691,6 +639,63 @@ def adjoStep(res, **kwargs):
     adjoRes.ind = adjoRes.ind[::-1]
 
     return adjoRes
+
+
+def printRes(res, **kwargs):
+
+    print('\n\nResults')
+
+    for key,value in kwargs.items():
+
+        if value == True:
+
+            print('\n' + key)
+
+            try:
+
+                getattr(res, key)[0][0][1]
+
+            except:
+
+                #print('%.5f' % getattr(res, key)[0])
+                #print('%.5f' % getattr(res, key)[-1])
+                print(getattr(res, key)[0])
+                print(getattr(res, key)[-1])
+
+
+            else:
+
+                print(getattr(res, key)[0][0])
+                print(getattr(res, key)[-1][-1])
+
+        def pertBlock():
+
+            j = 0
+
+            res.pert['atoms'] = []
+            res.pert['keff'] = []
+
+            for z in PERT:
+                zeroAt = nucData.At.copy()
+
+                pertId = nucData.ZAI.index(z)
+
+                print('\n\nPerturbed calculation ' + str(j + 1) + ' (' + nucData.ZAI[pertId] + ')\n')
+
+                Bdir = zeroAt[pertId]
+                Bper = zeroAt[pertId] * pert
+
+                zeroAt[pertId] = Bper
+
+                pertRes = directStep(zeroAt)
+
+                Npert = pertRes.comp[-1]
+                No = res.comp[-1]
+                res.pert['atoms'].append(Npert[respId] - No[respId])
+                res.pert['keff'].append((pertRes.keff[-1] - res.keff[-1]))
+
+                j = j + 1
+                # printRes(pertRes, keff=True, comp = False, phi = False, flux = False)
 
 def massPlot(res):
 
@@ -812,21 +817,22 @@ def adjoPlot(res, adjoRes, **kwargs):
     lab = ['power', 'at. density', 'flux shape']
     col = ['brown', 'green', 'orange']
 
-    if 'respId' in kwargs.keys():
+    resp = kwargs['resp']
 
-        c = nucData.getMM(ZAI[kwargs['respId']]) / 6.022E+23
-        resp = nucData.nuc[kwargs['respId']].name
+    if resp=='nuclide':
+
+        c = nucData.getMM(ZAI[respId]) / 6.022E+23
+        resp = nucData.nuc[respId].name
         sibyl = res.pert['atoms']
         title = resp + ' mass change [g]'
 
-    if 'resp' in kwargs.keys():
-        resp = kwargs['resp']
-        if resp == 'keff':
-            sibyl = res.pert['keff']
-            lab.extend(['flux adjoint','k-sens'])
-            col.extend(['gold','m'])
-            pcm = 1E+5
-            title = 'reactivity [pcm]'
+
+    if resp == 'keff':
+        sibyl = res.pert['keff']
+        lab.extend(['flux adjoint','k-sens'])
+        col.extend(['gold','m'])
+        pcm = 1E+5
+        title = 'reactivity [pcm]'
 
     erro = []
 
@@ -866,7 +872,6 @@ def adjoPlot(res, adjoRes, **kwargs):
 
         if z in PERT:
             kk = PERT.index(z)
-            print(kk)
             y = np.ones(len(x)) * sibyl[kk] * c
             ax1.plot(x, y, 'r--', markersize=15, label='pert')
             ax1.vlines(0, np.array(adjoRes.ind).transpose()[k][-1][0]*nn*c, y[0], linewidth=10, label='error')
@@ -918,7 +923,7 @@ def adjoPlot(res, adjoRes, **kwargs):
         else:
             ax3.annotate(string, (xx[j] -2*w, min(g[j]) * 1.6 * pcm))
 
-    ax3.set_yscale('symlog', linthresh=pcm*min([abs(a[-1]+a[1]) for a in np.array(g).transpose()+1E-6]))
+    ax3.set_yscale('symlog', linthresh=pcm*min([abs(a[-1]+a[0]) for a in np.array(g).transpose()+1E-6]))
     ax3.set(xlabel='\n1% Perturbed BOL isotope', ylabel='EOL '+title,
             title='PTERODAx contributions to EOL '+title+'  (rel. error)')
     ax3.legend(loc='best')
@@ -1048,7 +1053,7 @@ def printTime():
     diff = end - start
     chrono = divmod(diff.total_seconds(), 60)
 
-    print('\n\nExecution time: ' + str(int(chrono[0])) + ':' + '%02d' % (float(chrono[1]),) + ':%02d\t\t(min:sec:dec)\n' % (
+    print('\nExecution time: ' + str(int(chrono[0])) + ':' + '%02d' % (float(chrono[1]),) + ':%02d\t\t(min:sec:dec)\n' % (
             float(chrono[1]) * 100 % 100,))
 
 ### MAIN ###
@@ -1071,49 +1076,50 @@ def main(**kwargs):
     fluxSnap(psi[0],  'Fuel Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[0])
     fluxSnap(psi[2],  'Reflector Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[2])
 
-    if kwargs['ptero'] == True:
+    if kwargs['ptero'] != None:
 
         ### perturbed solution ###
 
-        pertBlock(res, spectrum=kwargs['spectrum'])
+        pertBlock(res, ND=kwargs['ND'])
 
         ### adjoint solution ###
 
-        print('\n\nAdjoint calculation\n')
+        resp = kwargs['ptero']
 
-        adjoRes=adjoStep(res, respId=respId, xs=MT)
-        #adjoRes=adjoStep(res, respId=respId)
-        #resKeff=adjoStep(res, keff=True)
+        if kwargs['ND'] == True :
 
+            print('\n\nAdjoint calculation\n')
 
-        adjoPrint = False
+            adjoRes=adjoStep(res, resp=resp, xs=MT)
 
+            bunSnap(adjoRes.ind[0], res, PERT[0], reac)
+
+        else:
+
+            print('\n\nAdjoint calculation\n')
+
+            adjoRes=adjoStep(res, resp=resp)
+
+        adjoPrint = True
         if adjoPrint == True:
 
-            print('\nAdjoint res\n')
+            #print('\nAdjoint res\n')
 
-            print('\nComp\n')
-
-            print(adjoRes.comp[0][0])
+            #print(adjoRes.comp[0][0])
             #print(adjoRes.comp[-1][-1])
 
-        ### plot ###
+            #paraPlot(nucData.sig['cap'][0][0], 'xs_U5')
+            #paraPlot(nucData.keff, 'SERPENT keff')
 
-        #paraPlot(nucData.sig['cap'][0][k], 'xs_U5')
-        #paraPlot(nucData.keff, 'SERPENT keff')
+            flu = adjoRes
 
-        flu = adjoRes
+            fluxPlot(flu.flux, 'Adjoint Flux', '')
+            fluxPlot(flu.source, 'Adjoint Source', '')
+            fluxPlot(flu.homo, 'Homogeneous adjoint Flux', '')
 
-        #bunSnap(adjoRes.ind[0], res, PERT[0], reac)
+        adjoPlot(res, adjoRes, resp=resp)
 
-        #fluxPlot(flu.flux, 'Adjoint Flux', '')
-        #fluxPlot(flu.source, 'Adjoint Source', '')
-        #fluxPlot(flu.homo, 'Homogeneous adjoint Flux', '')
-
-        #adjoPlot(res, adjoRes, respId = respId)
-        #adjoPlot(res, resKeff, resp='keff')
-
-main(ptero=True, spectrum=True)
+main(ptero=RESPONSE, ND=ND)
 
 ### chrono ###
 

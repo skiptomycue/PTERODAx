@@ -6,11 +6,9 @@ from serpentTools.settings import rc
 from periodictable import elements
 import matplotlib.pyplot as plt
 
-###############
-### STECHIO ###
-###############
+file     = '2_groups'            # INPUT ENERGY GROUPS
+fpSwitch =  False                # INPUT FULL NUCLIDE CHART
 
-file = 'gatti'
 res = ST.read(file + '/REP_res.m')
 dep = ST.read(file + '/REP_dep.m')
 time =  dep.days
@@ -18,8 +16,9 @@ giorni = dep.days[-1]
 T = dep.days[-1]*24*3600
 MXT=ST.MicroXSTuple
 
-tempo = np.linspace(0,5,10).tolist() + np.linspace(5,100,15).tolist()[1:] + np.linspace(100,giorni,25).tolist()[1:]
-#tempo = np.linspace(0,5,5).tolist() + np.linspace(5,100,10).tolist()[1:] + np.linspace(100,giorni,10).tolist()[1:]
+#tempo = np.linspace(0,5,10).tolist() + np.linspace(5,100,15).tolist()[1:] + np.linspace(100,giorni,25).tolist()[1:]
+tempo = np.linspace(0,5,10).tolist() + np.linspace(5,100,20).tolist()[1:] + np.linspace(100,giorni,100).tolist()[1:]
+#tempo = np.linspace(0, giorni, 1000)
 
 steps = len(tempo)
 nodo = int(len(dep.days)/2)
@@ -306,9 +305,13 @@ def getzaiElse():
 
 zaiOld=['531350','541350', '601490', '611490', '621490', '922340', '922350', '922380', '922390', '932390', '942390']
 zaiFuel=zaiOld
-#zaiFuel=getzaiFuel()
-#zaiElse=getzaiElse()
 zaiElse=['400900', '400910', '400920', '400940', '400960', '80160']
+
+if fpSwitch == True:
+
+    zaiFuel=getzaiFuel()
+    zaiElse=getzaiElse()
+
 ZAI=zaiFuel+zaiElse+['20040']+['80160']+['10010']
 
 def rescaleTime(xs, xsTime, newTime):
@@ -569,9 +572,6 @@ def xsPlot(sigma, MT, zai, t):
 
     fig.savefig('xs/'+zai+'_'+MT+'_xs.png')
 
-#xsPlot(sig,'102','922380',nodo)
-#xsPlot(sig,'103','922380',nodo)
-#xsPlot(sig,'18','922350',nodo)
-#xsPlot(sig,'102','922350',nodo)
+
 
 
