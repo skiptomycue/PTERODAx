@@ -9,16 +9,12 @@ from matplotlib.colors import LogNorm
 from periodictable import elements
 import copy
 
-####################
 ### NUCLEAR DATA ###
-####################
 
 sig   = nucData.sig
 steps = nucData.steps
 chi   = nucData.chi
-
 where = nucData.where
-
 ene = nucData.ene
 reg = 3
 lenPsi = ene*reg
@@ -39,11 +35,8 @@ class Results:
         self.ind =[]
         self.pert={}
         self.homo=[]
-###############
-### MATRICI ###
-###############
 
-### transport matrix ###
+### SIBYL ###
 
 def buildFiss(N, sigma, t, **kwargs):
 
@@ -177,14 +170,11 @@ def ribalta(LL):
 
     return mtx
 
-
-### UPDATE MACRO XS ###
+### bateman ###
 
 def reshapePsi(Psi):
 
     return np.array(Psi.reshape(ene,reg).transpose())
-
-# reaction rate for Bateman (no density)
 
 reaz = ['fission', '(n,gamma)', '(n,2n)', '(n,3n)', '(n,p)', '(n,a)', 'removal', 'sca']
 MT = ['18', '102', '16', '17', '103', '107', 'removal', 'sca']
@@ -211,8 +201,6 @@ def rr(sigma, psi, Phi, t):
                 rr[reaz[jj]] += np.inner(np.array(sigma[MT[jj]][j][t]) * where[i], psi[i][j]) * Phi
 
     return rr
-
-### transmutation matrix ###
 
 def buildPL(zai):
 
@@ -251,7 +239,7 @@ def buildPL(zai):
 
     return PL
 
-zai = nucData.zaiFuel
+zai = nucData.zai[nucData.fuelId]
 pl=buildPL(zai)
 
 def updatePL(PL, rr):
@@ -292,7 +280,7 @@ def Bateman(rr):
 
     burn=[]
 
-    for z in nucData.zaiElse:
+    for z in nucData.ZAI[len(nucData.zai[0]):]:
 
         k = nucData.ZAI.index(z)
 
@@ -302,12 +290,8 @@ def Bateman(rr):
 
     return tuple(map(tuple, M))
 
-#matrix.plotBU(np.matrix(M),'onix')
 
-
-################################
-### NORMALIZZAZIONE AGGIUNTA ###
-################################
+### PTERODAx ###
 
 def tramezzino(Ns,N,R):
 
@@ -406,6 +390,14 @@ def beta2(Gh, lam, N, t):
 
     return np.array(BETA)
 
+### PI ###
+
+def pi(Psi, Phi):
+    sf = np.array(sig['18'])
+
+    return (sf).dot(np.array(Psi)) * Phi
+
+### ND ###
 
 def betaSig(Psi, lam, pert, N, G, id, t):
 
@@ -420,7 +412,7 @@ def betaSig(Psi, lam, pert, N, G, id, t):
 
         B = Boltz(M * where, XS, t, lam)
 
-        BETA.append(tramezzino(Psi,G,B))
+        BETA.append(tramezzino(G,Psi,B))
 
     return np.array(BETA)
 
@@ -458,8 +450,6 @@ def PiSig(Psi, Phi, pert, N, id, t):
         PI.append(RR['fission'][id]*sig['v'][id]*N[id])
 
     return np.array(PI)
-
-
 
 def dR(Psi, Gh, N, k, t):
 
@@ -499,16 +489,7 @@ def dR2(Psi, Gh, N, k, t):
 
     return np.array(dR)*k
 
-### PI ###
-
-def pi(Psi, Phi):
-    sf = np.array(sig['18'])
-
-    return (sf).dot(np.array(Psi)) * Phi
-
-##########################
 ### RICERCA AUTOVALORE ###
-##########################
 
 def findK(N, t):
     lam = 0.5

@@ -3,8 +3,6 @@ import copy
 import numpy as np
 from scipy.integrate import odeint
 import scipy
-import fun
-import nucData
 import matplotlib.pyplot as plt
 import sys
 import os
@@ -12,57 +10,45 @@ import math
 import serpentTools as ST
 import onix
 from matplotlib.lines import Line2D
+import fun
+import nucData
+import serpent
 
 start = datetime.now()
 
-plt.rcParams.update({'figure.figsize': (15, 10)})
-plt.rcParams.update({'font.size': 22})
-plt.rcParams.update({'lines.linewidth': 4})
-plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
-plt.rcParams.update({'figure.max_open_warning': 60})
+PERT     = ['922350', '922380']                                    # INPUT PERTURBATION NUCLIDE
+RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
+RESPONSE =  'keff'                                                 # OUTPUT NUCLIDE OR KEFF
+ND       =  False                                                  # SWITCH ND PERTURBATION
+MT       =  '18'                                                   # INPUT PERTURBATION XS
+pert     =  1.01                                                   # INPUT PERTURBATION %
+P        =  1.55E+2                                                # INPUT POWER J/fiss
 
-##################
-### INITIALIZE ###
-##################
+### INITS ###
 
-ZAI = nucData.ZAI
-zeroAt = nucData.At
-sig = nucData.sig
-ene = nucData.ene
-reg = 3
-
-where = nucData.where
-nodo = nucData.nodo
-
-delta = '\u0394'
-square= '\u00b2'
-
-### depletion init ###
-
-P = 1.55E+2   # J/fiss
-T = nucData.T
-n = nucData.steps
-s = 1000
-
-#####################
-### PERTURBATION  ###
-#####################88
-
-PERT     = ['922350', '922380']                                     # INPUT PERTURBATION NUCLIDE
-MT       =  '102'                                                   # INPUT PERTURBATION XS
-RESP_NUC =  '942390'                                                # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  'keff'                                                  # OUTPUT NUCLIDE OR KEFF
-ND       =  False                                                   # SWITCH ND PERTURBATION
-
-
-pert = 1.01
+respId = nucData.ZAI.index(RESP_NUC)
 PERTid = nucData.ZAI.index(PERT[0])
 reac = fun.reaz[fun.MT.index(MT)]
-respId = nucData.ZAI.index(RESP_NUC)
+model = nucData.model
+where = nucData.where
+nodo = nucData.nodo
+zeroAt = nucData.At
+ZAI = nucData.ZAI
+sig = nucData.sig
+n = nucData.steps
+ene = nucData.ene
+delta = '\u0394'
+square= '\u00b2'
+T = nucData.T
+reg = 3
 
-##############
-### DEFINE ###
-##############
+plt.rcParams.update({'font.size': 22})
+plt.rcParams.update({'lines.linewidth': 4})
+plt.rcParams.update({'figure.figsize': (15, 10)})
+plt.rcParams.update({'figure.max_open_warning': 60})
+plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
+
+### SOLVERS ###
 
 def zeroStep(At, sig):
 
@@ -613,8 +599,8 @@ def adjoStep(res, **kwargs):
 
             # SENSITIVITY
 
-            Beta_sig = fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)*Phi
-            Bate_sig = fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
+            Beta_sig =  fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)*Phi
+            Bate_sig =  fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
             Pi_sig   = -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Ps
 
             # *sig['18'][e][v][PERTid]/RESP
@@ -640,6 +626,92 @@ def adjoStep(res, **kwargs):
 
     return adjoRes
 
+### PLOTS ###
+
+def printTime():
+    end = datetime.now()
+    diff = end - start
+    chrono = divmod(diff.total_seconds(), 60)
+
+    print('\nExecution time: ' + str(int(chrono[0])) + ':' + '%02d' % (float(chrono[1]),) + ':%02d\t\t(min:sec:dec)\n' % (
+            float(chrono[1]) * 100 % 100,))
+
+def massPlot(res):
+
+    dep = ST.read(nucData.file+'/REP_dep.m')
+
+    isoFuel=serpent.zais[nucData.model][nucData.fuelId]
+    isoElse=[]
+
+    prezz = []
+
+    mat = nucData.MAT
+
+    #x = np.linspace(0, T, n+1) / 3600 / 24
+
+    x = nucData.tempo
+    x2 = dep.days
+
+    for i in range(len(isoFuel)):
+
+        k=nucData.ZAI.index(isoFuel[i])
+        name = nucData.nuc[k].name
+
+        y1 = np.array([a[k] for a in res.comp]) * nucData.getMM(isoFuel[i]) / 6.022E+23
+
+        fig, ax1 = plt.subplots()
+
+        ax1.set(xlabel='BU (days)', ylabel='Nuclide mass [g]', title=name)
+        ax1.grid()
+
+        ax1.plot(x, y1, 'b', label = 'SIBYL')
+
+        if ZAI[k] not in ['922390', '932390', '942400']:
+
+            if len(nucData.nuc[k].mat)==0:
+
+                y2 = dep.materials[nucData.nuc[k].mat[0]].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
+                ax1.plot(x2, y2, 'r', label = 'SERPENT')
+
+        ax1.legend(loc='best')
+
+        #jump=abs(max(y1)-min(y1))
+        #ax1.set_ylim(min(y1)-0.1*jump, min(y1)+1.1*jump)
+
+        fig.savefig(model+'/masse/'+ isoFuel[i] + '.png')
+
+    for i in range(len(isoElse)):
+
+        k=nucData.ZAI.index(isoElse[i])
+
+        y1 = np.array([a[k] for a in res.comp]) * nucData.getMM(isoElse[i]) / 6.022E+23
+
+        y2 = dep.materials[mat[nucData.nuc[k].id]].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
+
+        fig, ax1 = plt.subplots()
+
+        if nucData.nuc[k].zai in prezz:
+
+            y2 = np.ones(len(x2))*y2[0]
+
+            ax1.set_ylim(y2[0]*0.5, y2[0]*1.1)
+
+        if nucData.nuc[k].xmat:
+
+            y2 += dep.materials[nucData.nuc[k].xmat].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
+
+
+        ax1.set(xlabel='BU (days)', ylabel='Nuclide mass [g]', title=nucData.nuc[k].name)
+        ax1.grid()
+
+        ax1.plot(x, y1, 'b', label = 'SIBYL')
+        ax1.plot(x2, y2, 'r', label = 'SERPENT')
+        ax1.legend(loc='center right')
+
+        #jump=abs(max(y1)-min(y1))
+        #ax1.set_ylim(min(y1)-0.1*jump, min(y1)+1.1*jump)
+
+        fig.savefig(model+'/masse/'+ nucData.nuc[k].name + '.png')
 
 def printRes(res, **kwargs):
 
@@ -697,81 +769,6 @@ def printRes(res, **kwargs):
                 j = j + 1
                 # printRes(pertRes, keff=True, comp = False, phi = False, flux = False)
 
-def massPlot(res):
-
-    dep = ST.read(nucData.file+'/REP_dep.m')
-
-    isoFuel=nucData.zaiOld
-    isoElse=[]
-
-    prezz = []
-
-    mat = nucData.MAT
-
-    #x = np.linspace(0, T, n+1) / 3600 / 24
-
-    x = nucData.tempo
-    x2 = dep.days
-
-    for i in range(len(isoFuel)):
-
-        k=nucData.ZAI.index(isoFuel[i])
-        name = nucData.nuc[k].name
-
-        y1 = np.array([a[k] for a in res.comp]) * nucData.getMM(isoFuel[i]) / 6.022E+23
-
-        fig, ax1 = plt.subplots()
-
-        ax1.set(xlabel='BU (days)', ylabel='Nuclide mass [g]', title=name)
-        ax1.grid()
-
-        ax1.plot(x, y1, 'b', label = 'SIBYL')
-
-        if ZAI[k] not in ['922390', '932390', '942400']:
-
-            y2 = dep.materials[mat[nucData.nuc[k].id]].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
-            ax1.plot(x2, y2, 'r', label = 'SERPENT')
-
-        ax1.legend(loc='best')
-
-        #jump=abs(max(y1)-min(y1))
-        #ax1.set_ylim(min(y1)-0.1*jump, min(y1)+1.1*jump)
-
-        fig.savefig('masse/'+ isoFuel[i] + '.png')
-
-    for i in range(len(isoElse)):
-
-        k=nucData.ZAI.index(isoElse[i])
-
-        y1 = np.array([a[k] for a in res.comp]) * nucData.getMM(isoElse[i]) / 6.022E+23
-
-        y2 = dep.materials[mat[nucData.nuc[k].id]].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
-
-        fig, ax1 = plt.subplots()
-
-        if nucData.nuc[k].zai in prezz:
-
-            y2 = np.ones(len(x2))*y2[0]
-
-            ax1.set_ylim(y2[0]*0.5, y2[0]*1.1)
-
-        if nucData.nuc[k].xmat:
-
-            y2 += dep.materials[nucData.nuc[k].xmat].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
-
-
-        ax1.set(xlabel='BU (days)', ylabel='Nuclide mass [g]', title=nucData.nuc[k].name)
-        ax1.grid()
-
-        ax1.plot(x, y1, 'b', label = 'SIBYL')
-        ax1.plot(x2, y2, 'r', label = 'SERPENT')
-        ax1.legend(loc='center right')
-
-        #jump=abs(max(y1)-min(y1))
-        #ax1.set_ylim(min(y1)-0.1*jump, min(y1)+1.1*jump)
-
-        fig.savefig('masse/'+ nucData.nuc[k].name + '.png')
-
 def paraPlot(para, name, **kwargs):
 
     #x = np.linspace(0, T/24/3600, len(para))
@@ -804,7 +801,7 @@ def paraPlot(para, name, **kwargs):
     ax1.plot(x, y1, 'b', label = 'SIBYL')
     ax1.legend(loc='upper right')
 
-    fig.savefig(name + '.png')
+    fig.savefig(model + '/' + name + '.png')
 
 def adjoPlot(res, adjoRes, **kwargs):
 
@@ -814,7 +811,7 @@ def adjoPlot(res, adjoRes, **kwargs):
     c = 1
     pcm = 1
 
-    lab = ['power', 'at. density', 'flux shape']
+    lab = ['power', 'at. evolution', 'flux spectrum']
     col = ['brown', 'green', 'orange']
 
     resp = kwargs['resp']
@@ -839,10 +836,10 @@ def adjoPlot(res, adjoRes, **kwargs):
     j = 0
 
 
-    lab.extend(['TOTAL'])
+    lab.extend(['TOTAL DPT'])
     col.extend(['b--'])
 
-    for z in nucData.zaiOld:
+    for z in serpent.zais[nucData.model][nucData.fuelId]:
 
         k = nucData.ZAI.index(z)
 
@@ -888,10 +885,10 @@ def adjoPlot(res, adjoRes, **kwargs):
 
         ax1.legend(loc='best')
 
-        fig.savefig('adjomasse/' + z + '.png')
+        fig.savefig(model+'/adjomasse/' + z + '.png')
 
     col[-1]='b'
-    lab.append('SIBYL')
+    lab.append('SIBYL DIRECT')
     col.append('r')
 
     fig3, ax3 = plt.subplots()
@@ -932,7 +929,7 @@ def adjoPlot(res, adjoRes, **kwargs):
     ax3.tick_params(axis='both', which='major', labelsize=18)
     ax3.margins(0.1)
 
-    fig3.savefig('adjohisto_'+resp)
+    fig3.savefig(model+'/adjohisto_'+resp)
 
 def fluxPlot(flux, name, UM, **kwargs):
 
@@ -980,7 +977,7 @@ def fluxPlot(flux, name, UM, **kwargs):
     axs[0].set( ylabel=name + ' [' + UM +']')
 
 
-    fig.savefig('flux/' + name + '.png')
+    fig.savefig(model+'/flux/' + name + '.png')
 
 def fluxSnap(flux, name, UM, **kwargs):
 
@@ -1014,16 +1011,16 @@ def fluxSnap(flux, name, UM, **kwargs):
     axs.legend(loc='upper right')
     axs.set_xlim(1E-9, 1E+1)
 
-    fig.savefig('flux/' + name + '_snap.png')
+    fig.savefig(model+'/flux/' + name + '_snap.png')
 
-def bunSnap(resu, res, name, xs):
+def bunSnap(resu, res, name, xs, BOL):
 
     x = nucData.grid
 
     fig, axs = plt.subplots()
 
     lin = [(0, ()), (0, ()), (0, ()), (0, (2,2))]
-    lab = ['at. density', 'flux shape', 'power', 'TOTAL']
+    lab = ['at. evolution', 'flux spectrum', 'power', 'TOTAL DPT']
     col = ['green', 'orange', 'brown', 'blue']
 
     j = 0
@@ -1046,15 +1043,8 @@ def bunSnap(resu, res, name, xs):
     axs.legend(loc='best')
     axs.set_xlim(1E-9, 1E+1)
 
-    fig.savefig('flux/sensitivity_to_'+name+'_snap.png')
+    fig.savefig(model+'/sensitivity_to_'+name+'_snap_'+BOL+'.png')
 
-def printTime():
-    end = datetime.now()
-    diff = end - start
-    chrono = divmod(diff.total_seconds(), 60)
-
-    print('\nExecution time: ' + str(int(chrono[0])) + ':' + '%02d' % (float(chrono[1]),) + ':%02d\t\t(min:sec:dec)\n' % (
-            float(chrono[1]) * 100 % 100,))
 
 ### MAIN ###
 
@@ -1092,7 +1082,8 @@ def main(**kwargs):
 
             adjoRes=adjoStep(res, resp=resp, xs=MT)
 
-            bunSnap(adjoRes.ind[0], res, PERT[0], reac)
+            bunSnap(adjoRes.ind[0], res, PERT[0], reac, 'BOL')
+            #bunSnap(adjoRes.ind[-2], res, PERT[-2], reac, 'EOL')
 
         else:
 
@@ -1100,7 +1091,10 @@ def main(**kwargs):
 
             adjoRes=adjoStep(res, resp=resp)
 
-        adjoPrint = True
+            adjoPlot(res, adjoRes, resp=resp)
+
+
+        adjoPrint = False
         if adjoPrint == True:
 
             #print('\nAdjoint res\n')
@@ -1117,14 +1111,11 @@ def main(**kwargs):
             fluxPlot(flu.source, 'Adjoint Source', '')
             fluxPlot(flu.homo, 'Homogeneous adjoint Flux', '')
 
-        adjoPlot(res, adjoRes, resp=resp)
-
 main(ptero=RESPONSE, ND=ND)
 
 ### chrono ###
 
 printTime()
-
 sys.exit(0)
 raise SystemExit
 

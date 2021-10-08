@@ -5,23 +5,49 @@ import serpentTools as ST
 from serpentTools.settings import rc
 from periodictable import elements
 import matplotlib.pyplot as plt
+import serpent
 
-file     = '2_groups'            # INPUT ENERGY GROUPS
-fpSwitch =  False                # INPUT FULL NUCLIDE CHART
+model    = 'UO2-pin'                                # INPUT MODEL
+energy   =  2                                       # INPUT ENERGY GROUPS
+PASSI    =  20                                      # INPUT STEP NUMBER
+fpSwitch =  False                                   # SWITCH TO FULL NUCLIDE CHART
 
+### INITS ###
+
+file     = model+'/'+str(energy)+'_groups'
 res = ST.read(file + '/REP_res.m')
 dep = ST.read(file + '/REP_dep.m')
+keff = ST.read(file+'/REP_res.m').resdata['absKeff'][:,0]
 time =  dep.days
 giorni = dep.days[-1]
 T = dep.days[-1]*24*3600
 MXT=ST.MicroXSTuple
 
-#tempo = np.linspace(0,5,10).tolist() + np.linspace(5,100,15).tolist()[1:] + np.linspace(100,giorni,25).tolist()[1:]
-tempo = np.linspace(0,5,10).tolist() + np.linspace(5,100,20).tolist()[1:] + np.linspace(100,giorni,100).tolist()[1:]
-#tempo = np.linspace(0, giorni, 1000)
+### TIME STEPS ###
 
+tempo_het  = np.linspace(0,5,10).tolist() + np.linspace(5,100,20).tolist()[1:] + np.linspace(100,giorni,100).tolist()[1:]
+tempo_homo = np.linspace(0, giorni, PASSI)
+tempo = tempo_homo
 steps = len(tempo)
-nodo = int(len(dep.days)/2)
+nodo = min([int(len(dep.days)/2),int(len(tempo)/2)])
+
+### SERPENT ###
+
+REACTIONS=serpent.REACTIONS
+vol=serpent.volumes[model]
+VOL=[sum(a) for a in vol]
+REG=serpent.regions[model]
+UNI=serpent.unis[model]
+DET=serpent.detectors[model]
+mat=serpent.materials[model]
+
+fuelId=REG.index('Fuel')
+chi  = res.universes[UNI[fuelId],0.0, 0, 0.0].infExp['infChit']
+grid = res.universes[UNI[fuelId],0.0, 0, 0.0].groups[::-1]
+ene  = len(chi)
+
+
+### FUNCTIONS ###
 
 def getMM(zai):
 
@@ -41,6 +67,7 @@ def getMM(zai):
         MM = int(a)
 
     return MM
+
 def getName(zai):
 
     z=zai[:-4]
@@ -63,75 +90,89 @@ def getName(zai):
 
     return Name
 
-volZr = 2.16817E-01
-volHe = 2.84600E-02
+def xsPlot(sigma, MT, zai, t):
 
-volClad = volZr + volHe
-volFuel = 6.92643E-01
-volCool = 1.14346E+00
+    x = grid[:-1]
+    id= ZAI.index(zai)
+    name = nuc[id].name
+    fig, axs = plt.subplots()
 
-VOL=[volFuel, volClad, volCool]
+    y = [sigma[MT][e][t][id]*1E+24/x[e] for e in range(ene)]
+    axs.step(x, y, where = 'pre')
+    tit = name+ ' MT '+MT+' cross section\n'
+    axs.set(xlabel='Energy [MeV]', ylabel='cross section [barn/MeV]', title=tit)
 
-######################
-### SERPENT MANUAL ###
-######################
+    axs.set_yscale('log')
+    axs.set_xscale('log')
 
-chi  = res.universes['20',0.0, 0, 0.0].infExp['infChit']
-grid = res.universes['20',0.0, 0, 0.0].groups[::-1]
-ene  = len(chi)
+    fig.savefig(model+'xs/'+zai+'_'+MT+'_xs.png')
 
-### scattering ###
+def rescaleTime(xs, xsTime, newTime):
 
-scaFuel = res.universes['20',0.0, 0, 0.0].infExp['infS0'].reshape(ene,ene)*VOL[0]
-scaClad = res.universes['2' ,0.0, 0, 0.0].infExp['infS0'].reshape(ene,ene)*VOL[1]
-scaCool = res.universes['50',0.0, 0, 0.0].infExp['infS0'].reshape(ene,ene)*VOL[2]
+    newXs = []
 
-scatt = [scaFuel, scaClad, scaCool]
+    for t in newTime:
 
-#scaFuel = [7.40651E-04, 2.06149E-03]
-#scaClad = [9.56363E-04, 4.30693E-04]
-#scaCool = [2.87179E-02, 2.69137E-03]
+        j = 0
 
-#scatt = np.array([scaFuel, scaClad, scaCool]).transpose()
+        while xsTime[j]+1 < t and j < (len(xsTime)-2):
 
-### nubar ###
+            j+=1
 
-nuU5 = np.array([2.65]*int((ene/2)) + [2.43]*int((ene/2)))
-nuPu = np.array([3.16]*int((ene/2)) + [2.86]*int((ene/2)))
+        width = time[j+1] - time[j]
 
-vU5 = 200.7E+6 * 1.6E-19      # J/fiss
-vPu = 207.0E+6 * 1.6E-19
+        #newXs.append(xs[j]*(xsTime[j+1]-t)/width+xs[j+1]*(t-xsTime[j])/width)
+        newXs.append(xs[nodo])
 
-#####################
-### REGIONS CLASS ###
-#####################
+    return newXs
 
-reg = []
+def readMDEP():
 
+    print('\nScanning nuclear data')
 
-class Region:
+    mdep = []
 
-    def __init__(self, name, id, vol):
-        self.id = id
-        self.vol = vol
-        self.name = name
+    for i in range(len(time)):
 
+        mdep.append(ST.read(file+'/REP_mdx'+str(i)+'.m'))
 
-def regDef(name, id, vol):
-    while len(reg) < (id + 1):
-        reg.append(0)
-    cla = Region(name, id, vol)
-    reg[cla.id] = cla
-    return cla
+    return mdep
 
-fuel = regDef('Fuel', 0, volFuel)
-clad = regDef('Cladding', 1, volClad)
-cool = regDef('Coolant', 2, volCool)
+def getZai(mdep):
 
+    out = []
 
-##################
-### XS OBJECTS ###
-##################
+    if fpSwitch == True:
+
+        for u in UNI:
+
+            zai = []
+
+            for key in mdep[0].xsVal[u].keys():
+
+                if key[0] not in [60000, 300000] and key[1] == 101:
+
+                    zai.append(key[0])
+
+            if u == UNI[fuelId]:
+
+                zai.extend(serpent.sama)
+
+            aiz=sorted(zai)
+
+            fuori=[str(z) for z in aiz]
+
+            out.append(fuori)
+
+    else:
+
+        out=serpent.zais[model]
+
+    ZAI=sum(out,[])
+
+    return out, ZAI
+
+### OBJECTS ###
 
 class xs:
 
@@ -154,6 +195,7 @@ class xs:
 
             if key in kwargs:
                 self.__setattr__(key, kwargs[key])                      # cla                       # xs
+
 def xsDef(**kwargs):
 
     keys = ['fis', 'cap', 'sca', 'nu']
@@ -178,17 +220,61 @@ def xsDef(**kwargs):
 
     return xs
 
-####################
-### SERPENT AUTO ###
-####################
+class Nuclide:
+
+    def __init__(self, name, idReg, zai, mat, vol, xs, nuc, **kwargs):
+
+        if zai in xs[UNI[idReg]].keys() :
+
+            for key in xs[UNI[idReg]][zai].keys():
+
+                xs[UNI[idReg]][zai][key] = (np.array(xs[UNI[idReg]][zai][key]) / vol * VOL[idReg]).tolist()
+
+            self.xs = {**xs[UNI[idReg]][zai], **xsDef(**kwargs)}
+
+        else :
+
+            self.xs = xsDef(**kwargs)
 
 
+        if name[-1] in ['0','1']:
 
-#corrBoro = np.concatenate((np.ones(int(steps/50*5+1))*2.1,np.ones(steps-int(steps/50*5))*1.6) , axis=0)
+            self.name = getName(zai)
 
-###############
-### ALBEDOS ###
-###############
+        else:
+
+            self.name = name
+
+        self.id = len(nuc)
+        self.reg = idReg
+        self.zai = zai
+        self.mat = mat
+
+        self.dens = 0
+        self.comp = 1E-40
+        self.vol  = 0
+        self.at   = 0
+
+        if int(zai[-1]) == 0:
+
+            for i in range(len(mat)):
+
+                if dep.materials[mat[i]].getValues('days','mdens', zai=int(zai))[0][0] > 0:
+
+                    self.dens += dep.materials[mat[i]].getValues('days','mdens', zai=int(zai))[0][0]
+                    self.vol  += vol[i]
+                    self.at   += dep.materials[mat[i]].getValues('days','mdens', zai=int(zai))[0][0] / getMM(zai) * vol[i] * 6.022E+23
+                    self.comp += (dep.materials[mat[i]].getValues('days','adens', zai=int(zai))[0][0]+1E-40) * vol[i] / VOL[idReg] * 6.022E+23
+
+### MAIN ###
+
+def buildScatt():
+
+    scatt=[]
+    for i in range(len(REG)):
+        scatt.append(res.universes[UNI[i],0.0, 0, 0.0].infExp['infS0'].reshape(ene,ene)*VOL[i])
+
+    return scatt
 
 def buildAlbe(det):
 
@@ -210,7 +296,7 @@ def buildAlbe(det):
 
     F=[]
 
-    reg=['fuel', 'clad', 'cool']
+    reg=serpent.detectors[model]
 
     for i in range(len(reg)):
 
@@ -224,6 +310,7 @@ def buildAlbe(det):
     F=np.array(F).transpose().ravel()
 
     return SS, F
+
 def cycleAlbe(time):
 
     Albe=[]
@@ -239,100 +326,7 @@ def cycleAlbe(time):
 
     return Albe, Flux,
 
-
-
-Albe, Flux = cycleAlbe(time)
-keff = ST.read(file+'/REP_res.m').resdata['absKeff'][:,0]
-
-
-#######################
-### MICRO DEPLETION ###
-#######################
-
-def readMDEP():
-
-    print('\nParsing nuclear data')
-
-    mdep = []
-
-    for i in range(len(time)):
-
-        mdep.append(ST.read(file+'/REP_mdx'+str(i)+'.m'))
-
-    return mdep
-
-mdep=readMDEP()
-
-UNI = ['20', '2', '50']
-REACTIONS = ['101', '102', '103', '107', '16', '17', '18' ]
-#sama = [621481, 621501, 621511, 631491, 641521, 631511, 611491, 631491, 621491, 621501, 631501]
-sama =[]
-def getzaiFuel():
-
-    zaiFuel=[]
-
-    for key in mdep[0].xsVal['20'].keys():
-
-        if key[0] not in [60000, 300000] and key[1] == 101:
-        #if key[0] not in [60000, 300000] and key[1] == 101:
-
-            zaiFuel.append(key[0])
-
-    zaiFuel.extend(sama)
-
-    zai=sorted(zaiFuel)
-
-    out=[str(z) for z in zai]
-
-    return out
-def getzaiElse():
-    zaiElse = []
-
-    for key in mdep[0].xsVal['2'].keys():
-
-        #if key[0] not in [130270, 10010, 10020, 80160] and key[1] == 101:
-        if key[1] == 101:
-
-            if mdep[0].getXS(universe='2', isotope=key[0], reaction=101)[0][1] != 0:
-
-                zaiElse.append(key[0])
-
-    zai=sorted(zaiElse)
-
-    out=[str(z) for z in zai]
-
-    return out
-
-zaiOld=['531350','541350', '601490', '611490', '621490', '922340', '922350', '922380', '922390', '932390', '942390']
-zaiFuel=zaiOld
-zaiElse=['400900', '400910', '400920', '400940', '400960', '80160']
-
-if fpSwitch == True:
-
-    zaiFuel=getzaiFuel()
-    zaiElse=getzaiElse()
-
-ZAI=zaiFuel+zaiElse+['20040']+['80160']+['10010']
-
-def rescaleTime(xs, xsTime, newTime):
-
-    newXs = []
-
-    for t in newTime:
-
-        j = 0
-
-        while xsTime[j]+1 < t and j < (len(xsTime)-2):
-
-            j+=1
-
-        width = time[j+1] - time[j]
-
-        #newXs.append(xs[j]*(xsTime[j+1]-t)/width+xs[j+1]*(t-xsTime[j])/width)
-        newXs.append(xs[nodo])
-
-    return newXs
-def buildXS(xsTime, newTime):
+def buildXS(xsTime, newTime, ZAI, mdep):
 
     xs={}
 
@@ -366,141 +360,47 @@ def buildXS(xsTime, newTime):
 
     return xs
 
+def buildNuc(zai, xs):
 
+    nuc = []
+    ZAI = []
+    MAT = []
 
-xs = buildXS(time, tempo)
-Albe = rescaleTime(Albe, time, tempo)
+    nuU5 = np.array([2.65] * int((ene / 2)) + [2.43] * int((ene / 2)))
+    nuPu = np.array([3.16] * int((ene / 2)) + [2.86] * int((ene / 2)))
 
+    vU5 = 200.7E+6 * 1.6E-19  # J/fiss
+    vPu = 207.0E+6 * 1.6E-19
 
-################
-### NUCLIDES ###
-################
+    for i in range(len(UNI)):
 
-######################
-### NUCLIDES CLASS ###
-######################
+        if i == fuelId:
 
-nuc=[]
-ZAI=[]
-MAT=[]
+            for z in zai[i]:
 
-class Nuclide:
+                nu = nuU5
+                v  = vU5
 
-    def __init__(self, name, idReg, zai, mat, vol, **kwargs):
+                if z == '942390':
+                    nu = nuPu
+                    v  = vPu
 
-        if zai in xs[UNI[idReg]].keys() :
-
-            for key in xs[UNI[idReg]][zai].keys():
-
-                xs[UNI[idReg]][zai][key] = (np.array(xs[UNI[idReg]][zai][key]) / vol * reg[idReg].vol).tolist()
-
-            self.xs = {**xs[UNI[idReg]][zai], **xsDef(**kwargs)}
-
-        else :
-
-            self.xs = xsDef(**kwargs)
-
-
-        if name[-1] in ['0','1']:
-
-            self.name = getName(zai)
-
+                elem = Nuclide(z, i, z, mat[i], vol[i], xs, nuc, nu=nu, v=v)
+                nuc.append(elem)
+                ZAI.append(elem.zai)
+                MAT.append(elem.mat)
         else:
 
-            self.name = name
-
-        self.id = len(nuc)
-        self.reg = idReg
-        self.zai = zai
-        self.mat = mat
-
-        if int(zai[-1]) != 0:
-            self.dens = 0
-            self.comp = 0
-
-        else:
-            self.dens = dep.materials[mat].getValues('days','mdens', zai=int(zai))[0][0]
-            self.comp = (dep.materials[mat].getValues('days','adens', zai=int(zai))[0][0]+1E-40) * vol / reg[idReg].vol * 6.022E+23
-
-        if 'xmat' in kwargs.keys():
-            self.dens+=dep.materials[kwargs['xmat']].getValues('days', 'mdens', zai=int(zai))[0][0]
-            self.xmat = kwargs['xmat']
-
-        else:
-            self.xmat = False
-
-        self.vol = vol
-        self.at = self.dens / getMM(zai) * vol * 6.022E+23
+            for z in zai[i]:
+                elem = Nuclide(z, i, z, mat[i], vol[i], xs, nuc)
+                nuc.append(elem)
+                ZAI.append(elem.zai)
+                MAT.append(elem.mat)
 
 
-def nucDef(name, idReg, zai, mat, vol, **kwargs):
+    return nuc, ZAI, MAT
 
-    cla = Nuclide(name, idReg, zai, mat, vol, **kwargs)
-
-    nuc.append(cla)
-    ZAI.append(cla.zai)
-    MAT.append(cla.mat)
-
-    return cla
-
-
-def buildFuel():
-
-    Fuel=[]
-    u='20'
-
-    for z in zaiFuel:
-
-        nu = nuU5
-        v  = vU5
-
-        if z == '942390':
-            nu = nuPu
-            v  = vPu
-
-        elem=nucDef(z, 0, z, 'fuel', volFuel, nu=nu, v=v)
-        Fuel.append(elem)
-
-    print('Done!\n')
-
-    return Fuel
-def buildClad():
-
-    Clad=[]
-    u='2'
-
-    for z in zaiElse:
-
-        elem=nucDef(z, 1, z, 'clad', volClad)
-        Clad.append(elem)
-
-    print('Done!\n')
-
-    return Clad
-
-FUEL=buildFuel()
-CLAD=buildClad()
-
-
-### absorbers ###
-
-#B = nucDef('Boron-10 (belt)', 2, '50100', 'boro', volB )
-He = nucDef('Helium', 1, '20040', 'helium', volHe )
-
-### heavy water ###
-
-OxC = nucDef('Oxygen-coolant',  2, '80160', 'water', volCool )
-H2C = nucDef('Hydrogen-coolant',  2, '10010', 'water', volCool )
-
-#####################
-### XS DICTIONARY ###
-#####################
-
-
-#Pm.xs['101']=[[0,0]]*len(Pm.xs['101'])
-#print(Pm.xs['101'])
-
-def buildSig():
+def buildSig(nuc):
 
     sig = {}
 
@@ -534,44 +434,56 @@ def buildSig():
 
     return sig
 
-sig = buildSig()
+def buildWhere(nuc):
 
-####################
-### ATOMS VECTOR ###
-####################
+        where = np.zeros((len(REG),len(nuc)))
 
-At = [a.at for a in nuc]
+        for a in nuc:
 
-where = np.zeros((len(reg),len(nuc)))
+            where[a.reg][a.id]=1
 
-for a in nuc:
+        return where
 
-    where[a.reg][a.id]=1
+def versorXS(At,sig):
 
-xs = sig.copy()
+        xs = sig.copy()
 
-for key in xs.keys():
+        for key in xs.keys():
 
-    xs[key] = np.zeros((ene,steps,len(At)))
+            xs[key] = np.zeros((ene,steps,len(At)))
+
+        return xs
 
 
-def xsPlot(sigma, MT, zai, t):
+def main():
 
-    x = grid[:-1]
-    id= ZAI.index(zai)
-    name = nuc[id].name
-    fig, axs = plt.subplots()
+    scatt = buildScatt()
 
-    y = [sigma[MT][e][t][id]*1E+24/x[e] for e in range(ene)]
-    axs.step(x, y, where = 'pre')
-    tit = name+ ' MT '+MT+' cross section\n'
-    axs.set(xlabel='Energy [MeV]', ylabel='cross section [barn/MeV]', title=tit)
+    ### MICRO DEPLETION ###
 
-    axs.set_yscale('log')
-    axs.set_xscale('log')
+    Albe, Flux = cycleAlbe(time)
+    mdep       = readMDEP()
+    zai, ZAI   = getZai(mdep)
 
-    fig.savefig('xs/'+zai+'_'+MT+'_xs.png')
+    xs   = buildXS(time, tempo, ZAI, mdep)
+    Albe = rescaleTime(Albe, time, tempo)
 
+    ### NUCLIDES ###
+
+    nuc, ZAI, MAT = buildNuc(zai, xs)
+    sig = buildSig(nuc)
+
+    ### VECTORS ###
+
+    At = [a.at for a in nuc]
+    where = buildWhere(nuc)
+    xs = versorXS(At,sig)
+
+    print('Done!\n')
+
+    return scatt, Albe, Flux, nuc, sig, zai, ZAI, MAT, where, At, xs
+
+scatt, Albe, Flux, nuc, sig, zai, ZAI, MAT, where, At, xs = main()
 
 
 
