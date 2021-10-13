@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 from periodictable import elements
 import copy
+import serpent
 
 ### NUCLEAR DATA ###
 
@@ -95,11 +96,7 @@ def buildTrasp(Albe, t, **kwargs):
 
 def buildSca(scatt, **kwargs):
 
-    scaFuel = scatt[0]
-    scaClad = scatt[1]
-    scaCool = scatt[2]
-
-    ene = len(scaFuel[0])
+    ene = len(scatt[0][0])
     reg = 3
 
     lista = []
@@ -107,15 +104,15 @@ def buildSca(scatt, **kwargs):
     for i in range(ene):
         for j in range(ene):
 
-            lista.append(np.diag([-scaFuel[i][j], -scaClad[i][j], -scaCool[i][j]]))
+            lista.append(np.diag([-scatt[0][i][j], -scatt[1][i][j], -scatt[2][i][j]]))
 
             if i == j:
 
-                pozzoFuel = sum(scaFuel[:][j])
-                pozzoClad = sum(scaClad[:][j])
-                pozzoCool = sum(scaCool[:][j])
+                pozzo1 = sum(scatt[0][:][j])
+                pozzo2 = sum(scatt[1][:][j])
+                pozzo3 = sum(scatt[2][:][j])
 
-                lista[-1] += np.diag([pozzoFuel, pozzoClad, pozzoCool])
+                lista[-1] += np.diag([pozzo1, pozzo2, pozzo3])
 
     A = np.array(lista).reshape(ene,ene,reg,reg)
 
@@ -139,7 +136,7 @@ def boltzL(N, sigma, t, **kwargs):
         S=S*0
         T=T*0
 
-    return A+S+T
+    return (A+S+T)
 
 def boltzF(N, sigma, t, **kwargs):
 
@@ -170,7 +167,7 @@ def ribalta(LL):
 
     return mtx
 
-### bateman ###
+### SALAMECHE ###
 
 def reshapePsi(Psi):
 
@@ -240,17 +237,29 @@ def buildPL(zai):
     return PL
 
 zai = nucData.zai[nucData.fuelId]
+
+p = 0
+
+if nucData.fuelId != 0:
+
+    p = len(nucData.zai[nucData.fuelId-1])
+    zai = zai[:-3]
+
 pl=buildPL(zai)
 
-def updatePL(PL, rr):
+def updatePL(PL, RR):
 
-    for i in range(len(PL.nucl_list)):
+    for j in range(len(PL.nucl_list)):
+
+        i = j+p
 
         for key in reaz[:-1]:
 
-            PL.passport_list[i].current_xs[key]=[rr[key][i], 0.0]
+            PL.passport_list[j].current_xs[key]=[RR[key][i], 0.0]
 
     return PL
+
+
 
 def onixR(PL):
 
@@ -258,7 +267,7 @@ def onixR(PL):
 
     zeros = np.diag(np.zeros(len(nucData.nuc)))
 
-    zeros[:R.shape[0], :R.shape[1]] = R
+    zeros[p:p+R.shape[0], p:p+R.shape[1]] = R
 
     return zeros
 
@@ -268,7 +277,7 @@ def onixD(PL):
 
     zeros = np.diag(np.zeros(len(nucData.nuc)))
 
-    zeros[:D.shape[0], :D.shape[1]] = D
+    zeros[p:p+D.shape[0], p:p+D.shape[1]] = D
 
     return zeros
 
@@ -278,15 +287,13 @@ def Bateman(rr):
 
     M = np.array(onixR(PL)) + np.array(onixD(PL))
 
-    burn=[]
+    burn=['280580', '280600', '50100']
 
-    for z in nucData.ZAI[len(nucData.zai[0]):]:
+    for i in range(len(nucData.ZAI)):
 
-        k = nucData.ZAI.index(z)
+        if nucData.ZAI[i] in burn:
 
-        if z in burn:
-
-            M[k,k]=-rr['removal'][k]
+            M[i,i]=-rr['removal'][i]
 
     return tuple(map(tuple, M))
 
@@ -326,8 +333,6 @@ def kSens(Gh, Psi, N, k, pertId, t):
 
     return sens
 
-### SORGENTE AGGIUNTA QS ###
-
 def Qs(N, Ns, Ps, Phi, t, dt):
     sf = np.array(sig['18'])
 
@@ -353,8 +358,6 @@ def Qs(N, Ns, Ps, Phi, t, dt):
         Q.append(I(Ns,N,R,dt) - fis*Phi)
 
     return Q
-
-### BETA ###
 
 def beta(Psi, lam, N, t):
     dN = np.zeros(len(N))
@@ -389,8 +392,6 @@ def beta2(Gh, lam, N, t):
         dN = np.zeros(len(N))
 
     return np.array(BETA)
-
-### PI ###
 
 def pi(Psi, Phi):
     sf = np.array(sig['18'])
@@ -429,7 +430,7 @@ def bateSig(Psi, Phi, pert, N, Ns, id, t, dt):
         RR = rr(XS,PSI,Phi,t)
         PL = updatePL(pl,RR)
 
-        R = Bateman(RR)
+        R = onixR(PL)
 
         BATE.append(I(Ns,N,R, dt))
 
@@ -623,8 +624,11 @@ def plotBU(A, name):
 
     im = axs.imshow(C, cmap='Reds',  norm=LogNorm(vmin=1E-4, vmax=1E+1))
     fig.colorbar(im, orientation='vertical')
-    plt.setp(axs, xticks=[0, 21, 43, 63, 87, 107, 131], xticklabels=['0','22','44','22','44','22','44'])
-    plt.setp(axs, yticks=[0, 21, 43, 63, 87, 107, 131], yticklabels=['0','22','44','22','44','22','44'])
+
+    if nucData.energy == 44:
+
+        plt.setp(axs, xticks=[0, 21, 43, 63, 87, 107, 131], xticklabels=['0','22','44','22','44','22','44'])
+        plt.setp(axs, yticks=[0, 21, 43, 63, 87, 107, 131], yticklabels=['0','22','44','22','44','22','44'])
 
     fig.savefig(name+'.png')
 

@@ -6,18 +6,22 @@ from serpentTools.settings import rc
 from periodictable import elements
 import matplotlib.pyplot as plt
 import serpent
+from datetime import datetime
 
-model    = 'UO2-pin'                                # INPUT MODEL
+startNuc = datetime.now()
+
+model    = 'LEU'                                # INPUT MODEL
 energy   =  2                                       # INPUT ENERGY GROUPS
-PASSI    =  20                                      # INPUT STEP NUMBER
-fpSwitch =  False                                   # SWITCH TO FULL NUCLIDE CHART
+PASSI    =  50                                      # INPUT STEP NUMBER
+fpSwitch =  True                                # SWITCH TO FULL NUCLIDE CHART
 
 ### INITS ###
 
-file     = model+'/'+str(energy)+'_groups'
-res = ST.read(file + '/REP_res.m')
-dep = ST.read(file + '/REP_dep.m')
-keff = ST.read(file+'/REP_res.m').resdata['absKeff'][:,0]
+input = serpent.inp[model]
+file = model+'/'+str(energy)+'_groups'
+res = ST.read(file + '/'+input+'_res.m')
+dep = ST.read(file + '/'+input+'_dep.m')
+keff = ST.read(file+'/'+input+'_res.m').resdata['absKeff'][:,0]
 time =  dep.days
 giorni = dep.days[-1]
 T = dep.days[-1]*24*3600
@@ -25,7 +29,7 @@ MXT=ST.MicroXSTuple
 
 ### TIME STEPS ###
 
-tempo_het  = np.linspace(0,5,10).tolist() + np.linspace(5,100,20).tolist()[1:] + np.linspace(100,giorni,100).tolist()[1:]
+tempo_het  = np.linspace(0,5,10).tolist() + np.linspace(5,giorni/10,20).tolist()[1:] + np.linspace(giorni/10,giorni,100).tolist()[1:]
 tempo_homo = np.linspace(0, giorni, PASSI)
 tempo = tempo_homo
 steps = len(tempo)
@@ -68,7 +72,7 @@ def getMM(zai):
 
     return MM
 
-def getName(zai):
+def getName(zai, idReg):
 
     z=zai[:-4]
     a=zai[-4:-1]
@@ -86,26 +90,27 @@ def getName(zai):
         Name = 'sarcazzo'
 
     Name += '-'+str(a)
-    Name=Name[0].upper()+Name[1:]
+    Name=Name[0].upper()+Name[1:]+ ' (' + REG[idReg] + ')'
 
     return Name
 
 def xsPlot(sigma, MT, zai, t):
 
-    x = grid[:-1]
+    x = grid
     id= ZAI.index(zai)
     name = nuc[id].name
     fig, axs = plt.subplots()
 
-    y = [sigma[MT][e][t][id]*1E+24/x[e] for e in range(ene)]
+    y = [0] + [sigma[MT][e][t][id]*1E+24/(x[e]**0) for e in range(ene)]
     axs.step(x, y, where = 'pre')
     tit = name+ ' MT '+MT+' cross section\n'
     axs.set(xlabel='Energy [MeV]', ylabel='cross section [barn/MeV]', title=tit)
-
+    axs.set_xlim(1E-12,1E+7)
+    #axs.set_ylim(min(y)/10,max(y)*10)
     axs.set_yscale('log')
     axs.set_xscale('log')
-
-    fig.savefig(model+'xs/'+zai+'_'+MT+'_xs.png')
+    print(y)
+    fig.savefig(model+'/xs/'+zai+'_'+MT+'_xs.png')
 
 def rescaleTime(xs, xsTime, newTime):
 
@@ -134,7 +139,7 @@ def readMDEP():
 
     for i in range(len(time)):
 
-        mdep.append(ST.read(file+'/REP_mdx'+str(i)+'.m'))
+        mdep.append(ST.read(file+'/'+input+'_mdx'+str(i)+'.m'))
 
     return mdep
 
@@ -222,49 +227,64 @@ def xsDef(**kwargs):
 
 class Nuclide:
 
-    def __init__(self, name, idReg, zai, mat, vol, xs, nuc, **kwargs):
-
-        if zai in xs[UNI[idReg]].keys() :
-
-            for key in xs[UNI[idReg]][zai].keys():
-
-                xs[UNI[idReg]][zai][key] = (np.array(xs[UNI[idReg]][zai][key]) / vol * VOL[idReg]).tolist()
-
-            self.xs = {**xs[UNI[idReg]][zai], **xsDef(**kwargs)}
-
-        else :
-
-            self.xs = xsDef(**kwargs)
-
+    def __init__(self, name, idReg, zai, mat, vol, xs, id, CB, **kwargs):
 
         if name[-1] in ['0','1']:
 
-            self.name = getName(zai)
+            self.name = getName(zai, idReg)
 
         else:
 
             self.name = name
 
-        self.id = len(nuc)
+        self.id  = id
         self.reg = idReg
         self.zai = zai
-        self.mat = mat
 
-        self.dens = 0
-        self.comp = 1E-40
-        self.vol  = 0
+        self.vol  = 1E-4
         self.at   = 0
+        self.comp   = 0
+        self.mat  = []
 
         if int(zai[-1]) == 0:
 
             for i in range(len(mat)):
 
-                if dep.materials[mat[i]].getValues('days','mdens', zai=int(zai))[0][0] > 0:
+                if dep.materials[mat[i]].getValues('days','mdens', zai=int(zai))[0][1] > 0 :
 
-                    self.dens += dep.materials[mat[i]].getValues('days','mdens', zai=int(zai))[0][0]
-                    self.vol  += vol[i]
+                    self.mat.append(mat[i])
                     self.at   += dep.materials[mat[i]].getValues('days','mdens', zai=int(zai))[0][0] / getMM(zai) * vol[i] * 6.022E+23
-                    self.comp += (dep.materials[mat[i]].getValues('days','adens', zai=int(zai))[0][0]+1E-40) * vol[i] / VOL[idReg] * 6.022E+23
+                    self.vol  += vol[i]
+
+        else:
+
+            for i in range(len(mat)):
+                self.vol += vol[i]
+                self.mat.append(mat[i])
+
+        if zai in xs[UNI[idReg]].keys() :
+            for key in xs[UNI[idReg]][zai].keys():
+
+                xs[UNI[idReg]][zai][key] = (np.array(xs[UNI[idReg]][zai][key]) / self.vol * VOL[idReg]).tolist()
+            self.xs = {**xs[UNI[idReg]][zai], **xsDef(**kwargs)}
+
+        else:
+
+            self.xs = xsDef(**kwargs)
+
+        if 'boro' in mat and zai == '50100':
+
+            self.mat = ['boro']
+            self.vol = serpent.volB
+            self.at  = dep.materials['boro'].getValues('days', 'mdens', zai=int(zai))[0][0] / getMM(zai) * self.vol * 6.022E+23
+
+            for key in xs[UNI[idReg]][zai].keys():
+               xs[UNI[idReg]][zai][key] = (np.array(xs[UNI[idReg]][zai][key])  * 0.7 * np.array(CB)   ).tolist()
+
+            self.xs = {**xs[UNI[idReg]][zai], **xsDef(**kwargs)}
+
+
+        #print(self.vol)
 
 ### MAIN ###
 
@@ -292,6 +312,10 @@ def buildAlbe(det):
 
     R_out=(abs(det.detectors['bordo'].tallies[::-1]))
 
+    if model == 'LEU':
+
+        R_out=(abs(det.detectors['bordo'].tallies[::-1])+abs(det.detectors['bordoup'].tallies[::-1])+abs(det.detectors['bordodown'].tallies[::-1]))*[1,1]
+
     RR=np.array([[R[0,1], -R[0,0], zero],[-R[0,1], (R[0,0]+R[1,1]), -R[1,0]],[zero, -R[1,1], R[1,0]+R_out]])
 
     F=[]
@@ -309,22 +333,37 @@ def buildAlbe(det):
 
     F=np.array(F).transpose().ravel()
 
-    return SS, F
+    CB=[]
+    CN=[]
+    CF=[]
+
+    if model == 'LEU':
+
+        CB=(np.array(det.detectors['boro'].tallies[::-1]/serpent.volB)/np.array(det.detectors['refl'].tallies[::-1]/serpent.volRefl)*1).tolist()
+        CN=(np.array(det.detectors['Ni'].tallies[::-1]/serpent.volNi)/np.array(det.detectors['cent'].tallies[::-1]/serpent.volCent)*1).tolist()
+        CF=(np.array(det.detectors['meat'].tallies[::-1]/serpent.volMeat)/np.array(det.detectors['fuel'].tallies[::-1]/serpent.volFuel)*1).tolist()
+
+    return SS, F, CB, CN, CF
 
 def cycleAlbe(time):
 
     Albe=[]
     Flux=[]
-
+    corrBoro=[]
+    corrNi=[]
+    corrFuel=[]
 
     for t in range(len(time)):
 
-        det = ST.read(file+'/REP_det'+str(int(t))+'.m')
-        Albedo, Flusso, = buildAlbe(det)
+        det = ST.read(file+'/'+input+'_det'+str(int(t))+'.m')
+        Albedo, Flusso, CB, CN, CF = buildAlbe(det)
         Albe.append(Albedo)
         Flux.append(Flusso)
+        corrBoro.append(CB)
+        corrNi.append(CN)
+        corrFuel.append(CF)
 
-    return Albe, Flux,
+    return Albe, Flux, np.array(corrBoro), np.array(corrNi), np.array(corrFuel)
 
 def buildXS(xsTime, newTime, ZAI, mdep):
 
@@ -360,17 +399,19 @@ def buildXS(xsTime, newTime, ZAI, mdep):
 
     return xs
 
-def buildNuc(zai, xs):
+def buildNuc(zai, xs, CB):
 
     nuc = []
-    ZAI = []
     MAT = []
+    NOM = []
 
     nuU5 = np.array([2.65] * int((ene / 2)) + [2.43] * int((ene / 2)))
     nuPu = np.array([3.16] * int((ene / 2)) + [2.86] * int((ene / 2)))
 
     vU5 = 200.7E+6 * 1.6E-19  # J/fiss
     vPu = 207.0E+6 * 1.6E-19
+
+    j = 0
 
     for i in range(len(UNI)):
 
@@ -385,20 +426,22 @@ def buildNuc(zai, xs):
                     nu = nuPu
                     v  = vPu
 
-                elem = Nuclide(z, i, z, mat[i], vol[i], xs, nuc, nu=nu, v=v)
+                elem = Nuclide(z, i, z, mat[i], vol[i], xs, j, CB, nu=nu, v=v)
                 nuc.append(elem)
-                ZAI.append(elem.zai)
                 MAT.append(elem.mat)
+                NOM.append(elem.name)
+
+                j+=1
         else:
 
             for z in zai[i]:
-                elem = Nuclide(z, i, z, mat[i], vol[i], xs, nuc)
+                elem = Nuclide(z, i, z, mat[i], vol[i], xs, j, CB)
                 nuc.append(elem)
-                ZAI.append(elem.zai)
                 MAT.append(elem.mat)
+                NOM.append(elem.name)
+                j+=1
 
-
-    return nuc, ZAI, MAT
+    return nuc, MAT, NOM
 
 def buildSig(nuc):
 
@@ -410,12 +453,7 @@ def buildSig(nuc):
 
         for nuclide in nuc:
 
-            if key == 'sca':
-                sig[key].append((np.array(nuclide.xs[key]) / np.array(nuclide.comp)).tolist())
-                #sig[key].append((np.array(nuclide.xs[key]) / np.array(nuclide.comp)).tolist()*steps)
-
-            else:
-                sig[key].append(nuclide.xs[key])
+            sig[key].append(nuclide.xs[key])
 
         sig[key] = np.array(sig[key]).transpose()
 
@@ -461,29 +499,34 @@ def main():
 
     ### MICRO DEPLETION ###
 
-    Albe, Flux = cycleAlbe(time)
+    Albe, Flux, corrBoro, corrNi, corrFuel = cycleAlbe(time)
     mdep       = readMDEP()
     zai, ZAI   = getZai(mdep)
 
     xs   = buildXS(time, tempo, ZAI, mdep)
     Albe = rescaleTime(Albe, time, tempo)
+    corrBoro = np.array(rescaleTime(corrBoro, time, tempo))
 
     ### NUCLIDES ###
 
-    nuc, ZAI, MAT = buildNuc(zai, xs)
+    nuc, MAT, NOM = buildNuc(zai, xs, corrBoro)
     sig = buildSig(nuc)
 
     ### VECTORS ###
 
     At = [a.at for a in nuc]
+    comp = [a.comp for a in nuc]
     where = buildWhere(nuc)
-    xs = versorXS(At,sig)
+    XS = versorXS(At,sig)
 
     print('Done!\n')
 
-    return scatt, Albe, Flux, nuc, sig, zai, ZAI, MAT, where, At, xs
+    return scatt, Albe, Flux, nuc, sig, zai, ZAI, MAT, NOM, where, At, comp, XS
 
-scatt, Albe, Flux, nuc, sig, zai, ZAI, MAT, where, At, xs = main()
+scatt, Albe, Flux, nuc, sig, zai, ZAI, MAT, NOM, where, At, comp, xs = main()
+
+endNuc = datetime.now()
 
 
-
+#xsPlot(sig,'18','922350',0)
+#xsPlot(sig,'102','922380',0)

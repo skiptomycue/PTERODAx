@@ -14,25 +14,24 @@ import fun
 import nucData
 import serpent
 
-start = datetime.now()
-
 PERT     = ['922350', '922380']                                    # INPUT PERTURBATION NUCLIDE
 RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  'keff'                                                 # OUTPUT NUCLIDE OR KEFF
-ND       =  False                                                  # SWITCH ND PERTURBATION
+RESPONSE =  None                                                 # OUTPUT NUCLIDE, KEFF OR NONE
+ND       =  True                                                  # SWITCH ND PERTURBATION
 MT       =  '18'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
-P        =  1.55E+2                                                # INPUT POWER J/fiss
 
 ### INITS ###
 
 respId = nucData.ZAI.index(RESP_NUC)
 PERTid = nucData.ZAI.index(PERT[0])
 reac = fun.reaz[fun.MT.index(MT)]
+P = serpent.power[nucData.model]
 model = nucData.model
 where = nucData.where
 nodo = nucData.nodo
 zeroAt = nucData.At
+zeroC = nucData.comp
 ZAI = nucData.ZAI
 sig = nucData.sig
 n = nucData.steps
@@ -54,7 +53,7 @@ def zeroStep(At, sig):
 
     res = fun.Results()
 
-    N = np.array(At) * where
+    N = np.array(At) * where #/ np.array([nucData.VOL] * len(At)).transpose()
 
     # flux shape algebra
 
@@ -69,11 +68,12 @@ def zeroStep(At, sig):
     #fun.plotBU(np.matrix(AA), 'Regions_mtx')
     #fun.plotBU(np.matrix(A), 'Transport_mtx')
 
-    A[1] = np.ones(ene*reg)
+
+    A[-1] = np.ones(ene*reg)
 
     B = np.zeros(len(A[0])).tolist()
 
-    B[1] = 1
+    B[-1] = 1
 
     Psi = np.linalg.inv(A).dot(B)
 
@@ -98,6 +98,8 @@ def zeroStep(At, sig):
     res.keff.append(k)
 
     res.M.append(C)
+
+    fun.plotBU(np.matrix(C), 'Depletion_mtx')
 
     return res
 
@@ -124,7 +126,7 @@ def directStep(At, sig):
         res.comp.append(At1.tolist())
         At = At1
 
-        N = np.array(At) * where
+        N = np.array(At) * where #/ np.array([nucData.VOL] * len(At)).transpose()
 
         # updated flux shape algebra
 
@@ -133,11 +135,11 @@ def directStep(At, sig):
 
         A = fun.Boltz(N, sig, i, 1 / k)
 
-        A[1] = np.ones(ene*reg)
+        A[-1] = np.ones(ene*reg)
 
         B = np.zeros(len(A[0])).tolist()
 
-        B[1] = 1
+        B[-1] = 1
 
         Psi = np.linalg.inv(A).dot(B)
 
@@ -279,11 +281,11 @@ def adjoStep(res, **kwargs):
 
             A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
 
-            A[1] = Psi
+            A[-1] = Psi
 
             B = np.zeros(len(A[0])).tolist()
 
-            B[1] = 1
+            B[-1] = 1
 
             Gh = np.linalg.inv(A).dot(B)
 
@@ -327,7 +329,7 @@ def adjoStep(res, **kwargs):
             # adjoint power normalization
 
             PL = fun.updatePL(fun.pl, rr )
-            R = fun.Bateman(rr)#-fun.onixD(PL)
+            R = fun.onixR(PL)
             Ps = (fun.I([Ns1, SS], [No, N],  R, dt) + ai) / P
 
             adjoRes.pow.append(Ps)
@@ -343,9 +345,9 @@ def adjoStep(res, **kwargs):
             A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
 
             #A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
-            A[1] = Gh
+            A[-1] = Gh
 
-            B[1] = 0
+            B[-1] = 0
 
             Gp = np.linalg.inv(A).dot(np.array(B))
 
@@ -356,7 +358,7 @@ def adjoStep(res, **kwargs):
             adjoRes.flux.append(G)
 
             A = fun.Boltz(No * where, sig, v, 1 / k)
-            A[1] = Psi
+            A[-1] = Psi
             G2 = np.linalg.inv(A).dot(np.array(-dR2))
 
             # step condition
@@ -416,11 +418,11 @@ def adjoStep(res, **kwargs):
 
             A = fun.Boltz(No * where, sig, v, 1/k).transpose()
 
-            A[1] = Psi
+            A[-1] = Psi
 
             B = np.zeros(len(A[0])).tolist()
 
-            B[1] = 1
+            B[-1] = 1
 
             Gh = np.linalg.inv(A).dot(B)
 
@@ -446,7 +448,7 @@ def adjoStep(res, **kwargs):
 
             PL=fun.updatePL(fun.pl, rr)
             R=fun.onixR(PL)
-            Ps=fun.I([Ns1,SS],[No,N],R, dt)/P
+            Ps=fun.I([Ns1,SS],[No,N],R, dt) / P
 
             adjoRes.pow.append(Ps)
 
@@ -460,16 +462,16 @@ def adjoStep(res, **kwargs):
 
             A = fun.Boltz(No * where, sig, v, 1/k).transpose()
 
-            A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
-            #A[1]=Gh
+            #A[-1]=fun.boltzF(No*where, sig, v).dot(Psi)
+            A[-1]=Gh
 
-            B[1]=0
+            B[-1]=0
 
             Gp = np.linalg.inv(A).dot(np.array(B))
 
             b = (fun.boltzF(No*where, sig, v).dot(Psi).dot(Gp))/(fun.boltzF(No*where, sig, v).dot(Psi).dot(Gh))
 
-            G = Gp - b*Gh*0
+            G = Gp - b*Gh
 
             adjoRes.flux.append(G)
 
@@ -559,7 +561,7 @@ def adjoStep(res, **kwargs):
             # adjoint power normalization
 
             PL=fun.updatePL(fun.pl, rr)
-            R=fun.Bateman(rr)
+            R=fun.onixR(PL)
             Ps=fun.I([Ns1,SS],[No,N],R, dt)/P
 
             adjoRes.pow.append(Ps)
@@ -601,7 +603,7 @@ def adjoStep(res, **kwargs):
 
             Beta_sig =  fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)*Phi
             Bate_sig =  fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
-            Pi_sig   = -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Ps
+            Pi_sig   =  -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Ps
 
             # *sig['18'][e][v][PERTid]/RESP
 
@@ -628,20 +630,49 @@ def adjoStep(res, **kwargs):
 
 ### PLOTS ###
 
-def printTime():
+def printTime(sd, ed, sa, ea):
     end = datetime.now()
-    diff = end - start
+    diff = end - nucData.startNuc
     chrono = divmod(diff.total_seconds(), 60)
 
-    print('\nExecution time: ' + str(int(chrono[0])) + ':' + '%02d' % (float(chrono[1]),) + ':%02d\t\t(min:sec:dec)\n' % (
+    diffNuc = nucData.endNuc - nucData.startNuc
+    chronoNuc = divmod(diffNuc.total_seconds(), 60)
+
+    print('\nRunning time: ' + str(int(chrono[0])) + ':' + '%02d' % (float(chrono[1]),) + ':%02d\t\t\t\t(min:sec:dec)\n' % (
             float(chrono[1]) * 100 % 100,))
+
+    print('Nuclear Data: ' + str(int(chronoNuc[0])) + ':' + '%02d' % (float(chronoNuc[1]),) + ':%02d' % (
+            float(chronoNuc[1]) * 100 % 100,))
+
+    if RESPONSE != None:
+
+        diffD = ed - sd
+        chronoD = divmod(diffD.total_seconds(), 60)
+
+        diffA = ea - sa
+        chronoA = divmod(diffA.total_seconds(), 60)
+
+        print('Direct calculations: ' + str(int(chronoD[0])) + ':' + '%02d' % (float(chronoD[1]),) + ':%02d' % (
+                float(chronoD[1]) * 100 % 100,))
+
+        print('Adjoint calculation: ' + str(int(chronoA[0])) + ':' + '%02d' % (float(chronoA[1]),) + ':%02d' % (
+                float(chronoA[1]) * 100 % 100,))
+
+    print('')
 
 def massPlot(res):
 
-    dep = ST.read(nucData.file+'/REP_dep.m')
+    dep = ST.read(nucData.file+'/'+nucData.input+'_dep.m')
 
-    isoFuel=serpent.zais[nucData.model][nucData.fuelId]
-    isoElse=[]
+    isoFuel = serpent.zais[nucData.model][nucData.fuelId]
+    isoElse = []
+    m = 'fuel'
+
+    if nucData.model == 'LEU':
+        m = 'Fuel'
+        isoElse = ['280580', '280600', '50100']
+        regElse=[0, 0, 2]
+        matElse=['Ni', 'Ni', 'boro']
 
     prezz = []
 
@@ -657,7 +688,7 @@ def massPlot(res):
         k=nucData.ZAI.index(isoFuel[i])
         name = nucData.nuc[k].name
 
-        y1 = np.array([a[k] for a in res.comp]) * nucData.getMM(isoFuel[i]) / 6.022E+23
+        y1 = np.array([a[k] for a in res.comp]) * nucData.getMM(isoFuel[i])  / 6.022E+23
 
         fig, ax1 = plt.subplots()
 
@@ -668,9 +699,11 @@ def massPlot(res):
 
         if ZAI[k] not in ['922390', '932390', '942400']:
 
-            if len(nucData.nuc[k].mat)==0:
 
-                y2 = dep.materials[nucData.nuc[k].mat[0]].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
+
+            if m in nucData.nuc[k].mat:
+
+                y2 = dep.materials[m].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
                 ax1.plot(x2, y2, 'r', label = 'SERPENT')
 
         ax1.legend(loc='best')
@@ -682,11 +715,11 @@ def massPlot(res):
 
     for i in range(len(isoElse)):
 
-        k=nucData.ZAI.index(isoElse[i])
+        k=nucData.NOM.index(nucData.getName(isoElse[i],regElse[i]))
 
         y1 = np.array([a[k] for a in res.comp]) * nucData.getMM(isoElse[i]) / 6.022E+23
 
-        y2 = dep.materials[mat[nucData.nuc[k].id]].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
+        y2 = dep.materials[matElse[i]].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
 
         fig, ax1 = plt.subplots()
 
@@ -695,11 +728,6 @@ def massPlot(res):
             y2 = np.ones(len(x2))*y2[0]
 
             ax1.set_ylim(y2[0]*0.5, y2[0]*1.1)
-
-        if nucData.nuc[k].xmat:
-
-            y2 += dep.materials[nucData.nuc[k].xmat].getValues('days','mdens', zai=int(ZAI[k]))[0]*nucData.nuc[k].vol
-
 
         ax1.set(xlabel='BU (days)', ylabel='Nuclide mass [g]', title=nucData.nuc[k].name)
         ax1.grid()
@@ -956,7 +984,7 @@ def fluxPlot(flux, name, UM, **kwargs):
         axs[i].plot(t, therm, 'b', label='thermal')
         axs[i].plot(t, fast, 'r', label='fast')
         axs[i].set_xlim(0, nucData.giorni)
-        axs[i].set(xlabel='BU (days)', title=nucData.reg[i].name)
+        axs[i].set(xlabel='BU (days)', title=nucData.REG[i])
 
     if 'serp' in kwargs.keys():
 
@@ -1056,19 +1084,28 @@ def main(**kwargs):
 
     printRes(res, keff=True, comp = False, phi = False, flux = False)
 
-    paraPlot(res.keff, 'keff', serp=True, paraserp=[nucData.time, nucData.keff])
 
-    massPlot(res)
+    if nucData.fpSwitch == True:
 
-    #fluxPlot(res.flux,  'Neutron Flux', 'n/cm'+square+'s', phi=res.phi, serp=nucData.Flux)
-    psi = fun.reshapePsi(res.flux[0])
-    serpsi = fun.reshapePsi(nucData.Flux[0])
-    fluxSnap(psi[0],  'Fuel Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[0])
-    fluxSnap(psi[2],  'Reflector Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[2])
+        massPlot(res)
+        paraPlot(res.keff, 'keff', serp=True, paraserp=[nucData.time, nucData.keff])
+        fluxPlot(res.flux,  'Neutron Flux', 'n/cm'+square+'s', phi=res.phi, serp=nucData.Flux)
+
+        psi = fun.reshapePsi(res.flux[0])
+        serpsi = fun.reshapePsi(nucData.Flux[0])
+        fluxSnap(psi[0],  'Fuel Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[0])
+        fluxSnap(psi[2],  'Reflector Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[2])
+
+    startD = 0
+    endD   = 0
+    startA = 0
+    endA   = 0
 
     if kwargs['ptero'] != None:
 
         ### perturbed solution ###
+
+        startD = datetime.now()
 
         pertBlock(res, ND=kwargs['ND'])
 
@@ -1076,11 +1113,17 @@ def main(**kwargs):
 
         resp = kwargs['ptero']
 
+        endD = datetime.now()
+
         if kwargs['ND'] == True :
+
+            startA = datetime.now()
 
             print('\n\nAdjoint calculation\n')
 
             adjoRes=adjoStep(res, resp=resp, xs=MT)
+
+            endA = datetime.now()
 
             bunSnap(adjoRes.ind[0], res, PERT[0], reac, 'BOL')
             #bunSnap(adjoRes.ind[-2], res, PERT[-2], reac, 'EOL')
@@ -1097,25 +1140,19 @@ def main(**kwargs):
         adjoPrint = False
         if adjoPrint == True:
 
-            #print('\nAdjoint res\n')
-
-            #print(adjoRes.comp[0][0])
-            #print(adjoRes.comp[-1][-1])
-
-            #paraPlot(nucData.sig['cap'][0][0], 'xs_U5')
-            #paraPlot(nucData.keff, 'SERPENT keff')
-
             flu = adjoRes
 
             fluxPlot(flu.flux, 'Adjoint Flux', '')
             fluxPlot(flu.source, 'Adjoint Source', '')
             fluxPlot(flu.homo, 'Homogeneous adjoint Flux', '')
 
+    printTime(startD, endD, startA, endA)
+
+
 main(ptero=RESPONSE, ND=ND)
 
 ### chrono ###
 
-printTime()
 sys.exit(0)
 raise SystemExit
 
