@@ -10,7 +10,7 @@ from datetime import datetime
 
 startNuc = datetime.now()
 
-model    = 'LEU'                                # INPUT MODEL
+model    = 'UO2'                                # INPUT MODEL
 energy   =  2                                       # INPUT ENERGY GROUPS
 PASSI    =  50                                      # INPUT STEP NUMBER
 fpSwitch =  True                                # SWITCH TO FULL NUCLIDE CHART
@@ -34,7 +34,7 @@ tempo_homo = np.linspace(0, giorni, PASSI)
 tempo = tempo_homo
 steps = len(tempo)
 nodo = min([int(len(dep.days)/2),int(len(tempo)/2)])
-
+print(nodo)
 ### SERPENT ###
 
 REACTIONS=serpent.REACTIONS
@@ -227,61 +227,67 @@ def xsDef(**kwargs):
 
 class Nuclide:
 
-    def __init__(self, name, idReg, zai, mat, vol, xs, id, CB, **kwargs):
+    def __init__(self, zlist, idReg, z, mat, vol, xs, id, CB, **kwargs):
 
-        if name[-1] in ['0','1']:
+        if z[-1] in ['0','1']:
 
-            self.name = getName(zai, idReg)
+            self.name = getName(z, idReg)
 
         else:
 
-            self.name = name
+            self.name = z
 
         self.id  = id
         self.reg = idReg
-        self.zai = zai
+        self.zai = z
 
         self.vol  = 1E-4
         self.at   = 0
         self.comp   = 0
         self.mat  = []
 
-        if int(zai[-1]) == 0:
+        d = []
 
-            for i in range(len(mat)):
+        for i in range(len(mat)):
 
-                if dep.materials[mat[i]].getValues('days','mdens', zai=int(zai))[0][1] > 0 :
-
+            if z not in ['621481']+[str(a) for a in serpent.sama]:
+                if dep.materials[mat[i]].getValues('days','mdens', zai=int(z))[0][nodo] > 0 :
                     self.mat.append(mat[i])
-                    self.at   += dep.materials[mat[i]].getValues('days','mdens', zai=int(zai))[0][0] / getMM(zai) * vol[i] * 6.022E+23
+                    self.at   += dep.materials[mat[i]].getValues('days','mdens', zai=int(z))[0][0] / getMM(z) * vol[i] * 6.022E+23
                     self.vol  += vol[i]
+                d.append(dep.materials[mat[i]].getValues('days','mdens', zai=int(z))[0][0])
 
-        else:
+            else:
+                self.mat = serpent.materials[model][fuelId][0]
+                self.vol = serpent.volumes[model][fuelId][0]
+                d.append(0)
 
-            for i in range(len(mat)):
-                self.vol += vol[i]
-                self.mat.append(mat[i])
+        if self.mat == [] and idReg == fuelId:
+            self.mat = serpent.materials[model][fuelId][0]
 
-        if zai in xs[UNI[idReg]].keys() :
-            for key in xs[UNI[idReg]][zai].keys():
+        #self.vol = vol[np.argmax(np.array(d))]
 
-                xs[UNI[idReg]][zai][key] = (np.array(xs[UNI[idReg]][zai][key]) / self.vol * VOL[idReg]).tolist()
-            self.xs = {**xs[UNI[idReg]][zai], **xsDef(**kwargs)}
+        if z in xs[UNI[idReg]].keys() :
+
+            for key in xs[UNI[idReg]][z].keys():
+
+                xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key]) / self.vol * VOL[idReg]).tolist()
+            self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
 
         else:
 
             self.xs = xsDef(**kwargs)
 
-        if 'boro' in mat and zai == '50100':
+        if 'boro' in mat and z == '50100':
 
             self.mat = ['boro']
             self.vol = serpent.volB
-            self.at  = dep.materials['boro'].getValues('days', 'mdens', zai=int(zai))[0][0] / getMM(zai) * self.vol * 6.022E+23
+            self.at  = dep.materials['boro'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
 
-            for key in xs[UNI[idReg]][zai].keys():
-               xs[UNI[idReg]][zai][key] = (np.array(xs[UNI[idReg]][zai][key])  * 0.7 * np.array(CB)   ).tolist()
+            for key in xs[UNI[idReg]][z].keys():
+               xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key])  * 0.7 * np.array(CB)).tolist()
 
-            self.xs = {**xs[UNI[idReg]][zai], **xsDef(**kwargs)}
+            self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
 
 
         #print(self.vol)
@@ -379,7 +385,7 @@ def buildXS(xsTime, newTime, ZAI, mdep):
 
             for r in REACTIONS:
 
-                if MXT(zai=int(z),mt=int(r),metastable=0) in mdep[0].xsVal[u].keys() or MXT(zai=int(z),mt=int(r),metastable=1) in mdep[0].xsVal[u].keys() :
+                if MXT(zai=int(z),mt=int(r),metastable=0) in mdep[nodo].xsVal[u].keys() or MXT(zai=int(z),mt=int(r),metastable=1) in mdep[nodo].xsVal[u].keys() :
 
                     xs[u][z][r]=[]
 
@@ -426,7 +432,7 @@ def buildNuc(zai, xs, CB):
                     nu = nuPu
                     v  = vPu
 
-                elem = Nuclide(z, i, z, mat[i], vol[i], xs, j, CB, nu=nu, v=v)
+                elem = Nuclide(zai, i, z, mat[i], vol[i], xs, j, CB, nu=nu, v=v)
                 nuc.append(elem)
                 MAT.append(elem.mat)
                 NOM.append(elem.name)
@@ -435,7 +441,7 @@ def buildNuc(zai, xs, CB):
         else:
 
             for z in zai[i]:
-                elem = Nuclide(z, i, z, mat[i], vol[i], xs, j, CB)
+                elem = Nuclide(zai, i, z, mat[i], vol[i], xs, j, CB)
                 nuc.append(elem)
                 MAT.append(elem.mat)
                 NOM.append(elem.name)
@@ -530,3 +536,8 @@ endNuc = datetime.now()
 
 #xsPlot(sig,'18','922350',0)
 #xsPlot(sig,'102','922380',0)
+
+#for a in nuc:
+
+#    print([str(a.vol)] + [a.zai])
+
