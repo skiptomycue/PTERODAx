@@ -14,10 +14,10 @@ import fun
 import nucData
 import serpent
 
-PERT     = ['922350', '922380']                                    # INPUT PERTURBATION NUCLIDE
+PERT     = ['922350', '922380', '280580', '50100']                                    # INPUT PERTURBATION NUCLIDE
 RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  None                                                 # OUTPUT NUCLIDE, KEFF OR NONE
-ND       =  True                                                  # SWITCH ND PERTURBATION
+RESPONSE =  'nuclide'                                                 # OUTPUT NUCLIDE, KEFF OR NONE
+ND       =  False                                                  # SWITCH ND PERTURBATION
 MT       =  '18'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
 
@@ -57,7 +57,7 @@ def zeroStep(At, sig):
 
     # flux shape algebra
 
-    k = fun.crushK(N, 0, 0.5, 2)
+    k = fun.crushK(N, sig, 0, 0.5, 2)
     #k=fun.findK(N, 0)
     print(k)
 
@@ -130,7 +130,7 @@ def directStep(At, sig):
 
         # updated flux shape algebra
 
-        k = fun.crushK(N, i, 0.3, 3)
+        k = fun.crushK(N, sig, i, 0.3, 3)
         #k=fun.findK(N, i)
 
         A = fun.Boltz(N, sig, i, 1 / k)
@@ -152,7 +152,7 @@ def directStep(At, sig):
 
         # updated transmuation matrix
 
-        rr = fun.rr(fun.sig, psi, Phi, i)
+        rr = fun.rr(sig, psi, Phi, i)
 
         C = fun.Bateman(rr)
 
@@ -462,8 +462,8 @@ def adjoStep(res, **kwargs):
 
             A = fun.Boltz(No * where, sig, v, 1/k).transpose()
 
-            #A[-1]=fun.boltzF(No*where, sig, v).dot(Psi)
-            A[-1]=Gh
+            A[-1]=fun.boltzF(No*where, sig, v).dot(Psi)
+            #A[-1]=Gh
 
             B[-1]=0
 
@@ -601,7 +601,7 @@ def adjoStep(res, **kwargs):
 
             # SENSITIVITY
 
-            Beta_sig =  fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)*Phi
+            Beta_sig =  fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)
             Bate_sig =  fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
             Pi_sig   =  -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Ps
 
@@ -695,7 +695,7 @@ def massPlot(res):
         ax1.set(xlabel='BU (days)', ylabel='Nuclide mass [g]', title=name)
         ax1.grid()
 
-        ax1.plot(x, y1, 'b', label = 'SIBYL')
+        ax1.plot(x, y1, 'b', label = 'SIBYL DIRECT')
 
         if ZAI[k] not in ['922390', '932390', '942400']:
 
@@ -732,7 +732,7 @@ def massPlot(res):
         ax1.set(xlabel='BU (days)', ylabel='Nuclide mass [g]', title=nucData.nuc[k].name)
         ax1.grid()
 
-        ax1.plot(x, y1, 'b', label = 'SIBYL')
+        ax1.plot(x, y1, 'b', label = 'SIBYL DIRECT')
         ax1.plot(x2, y2, 'r', label = 'SERPENT')
         ax1.legend(loc='center right')
 
@@ -826,7 +826,7 @@ def paraPlot(para, name, **kwargs):
     ax1.set(xlabel='BU (days)', ylabel='SIBYL '+name, title = name + ' BU evolution')
     ax1.grid()
 
-    ax1.plot(x, y1, 'b', label = 'SIBYL')
+    ax1.plot(x, y1, 'b', label = 'SIBYL DIRECT')
     ax1.legend(loc='upper right')
 
     fig.savefig(model + '/' + name + '.png')
@@ -867,7 +867,7 @@ def adjoPlot(res, adjoRes, **kwargs):
     lab.extend(['TOTAL DPT'])
     col.extend(['b--'])
 
-    for z in serpent.zais[nucData.model][nucData.fuelId]:
+    for z in PERT:
 
         k = nucData.ZAI.index(z)
 
@@ -905,7 +905,7 @@ def adjoPlot(res, adjoRes, **kwargs):
             X.append(name)
 
             e =(np.array(adjoRes.ind).transpose()[k][-1][0]*nn*c - sibyl[kk]*c) / sibyl[kk]/c * 100
-            erro.append(e)
+            erro.append(abs(e))
             string = '%.1f' % abs(e) + '%'
             ax1.annotate(string, (0, y[0]*(1 - 0.05*np.sign(e))))
 
@@ -932,6 +932,7 @@ def adjoPlot(res, adjoRes, **kwargs):
         ax3.bar(xx - w * len(lab) / 2 + w * i, a*pcm, width=w, color=col[i], label=lab[i])
         i = i + 1
 
+
     for j in range(len(erro)):
 
         string = '%.1f' % (erro[j]) + '%'
@@ -939,7 +940,7 @@ def adjoPlot(res, adjoRes, **kwargs):
         if pcm == 1E+5:
             string = '%.1f' % (erro[j]) + '% ('+str(abs(int(erro[j]*g[j][-1]*pcm/100)))+' pcm)'
 
-        if abs(erro[j]) > 100:
+        if abs(erro[j]) > 100 or abs(sibyl[j]*pcm) < 1:
             string = '      NR'
 
         if g[j][-2] > 0:
@@ -1022,7 +1023,7 @@ def fluxSnap(flux, name, UM, **kwargs):
 
     therm=[phi*flux[j] for j in range(len(flux))] + [0]
 
-    axs.step(x, therm, 'b', where='pre', label='SIBYL')
+    axs.step(x, therm, 'b', where='pre', label='SIBYL DIRECT')
     #axs.set_xlim(0, ene)
     axs.set(xlabel='Energy [MeV]', ylabel=name + ' [' + UM +']', title='Flux spectrum')
 
@@ -1055,7 +1056,7 @@ def bunSnap(resu, res, name, xs, BOL):
 
     for flux in resu:
 
-        y = flux + [0]
+        y = np.array([flux[e] * sig[MT][e][nodo][PERTid] * (pert-1)  for e in range(ene)] + [0]) *nucData.getMM(RESP_NUC)/6.022E+23
         axs.step(x, y, col[j], linestyle= lin[j], where = 'pre', label=lab[j])
         tit = 'EOL '+nucData.nuc[respId].name+' Sensitivity to '+nucData.nuc[PERTid].name+' '+xs+' cross section\n'
         axs.set(xlabel='Energy [MeV]', ylabel='sensitivity', title=tit)
@@ -1066,12 +1067,17 @@ def bunSnap(resu, res, name, xs, BOL):
 
     RESP = res.comp[-1][respId]
     #y2 = [res.pert['atoms'][e]/RESP/(pert-1) for e in range(ene)] + [0]
-    y2 = [res.pert['atoms'][e]/(sig[MT][e][nodo][PERTid]*(pert-1)) for e in range(ene)] + [0]
-    axs.step(x, y2, 'red', linestyle=lin[-1], where='pre', label='SIBYL')
+    #y2 = [res.pert['atoms'][e]/(sig[MT][e][nodo][PERTid]*(pert-1)) for e in range(ene)] + [0]
+    y2 = np.array(res.pert['atoms'] + [0]) *nucData.getMM(RESP_NUC)/6.022E+23
+    axs.step(x, y2, 'red', linestyle=lin[-1], where='pre', label='SIBYL DIRECT')
     axs.legend(loc='best')
     axs.set_xlim(1E-9, 1E+1)
 
-    fig.savefig(model+'/sensitivity_to_'+name+'_snap_'+BOL+'.png')
+
+    print(sum(y))
+    print(sum(y2))
+
+    fig.savefig(model+'/sensitivity_to_'+name+'_snap_'+BOL+'_'+xs+'.png')
 
 
 ### MAIN ###
@@ -1115,15 +1121,13 @@ def main(**kwargs):
 
         endD = datetime.now()
 
-        if kwargs['ND'] == True :
+        startA = datetime.now()
 
-            startA = datetime.now()
+        if kwargs['ND'] == True :
 
             print('\n\nAdjoint calculation\n')
 
             adjoRes=adjoStep(res, resp=resp, xs=MT)
-
-            endA = datetime.now()
 
             bunSnap(adjoRes.ind[0], res, PERT[0], reac, 'BOL')
             #bunSnap(adjoRes.ind[-2], res, PERT[-2], reac, 'EOL')
@@ -1136,6 +1140,7 @@ def main(**kwargs):
 
             adjoPlot(res, adjoRes, resp=resp)
 
+        endA = datetime.now()
 
         adjoPrint = False
         if adjoPrint == True:

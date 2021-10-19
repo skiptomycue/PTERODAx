@@ -243,7 +243,10 @@ p = 0
 if nucData.fuelId != 0:
 
     p = len(nucData.zai[nucData.fuelId-1])
-    zai = zai[:-3]
+
+    if nucData.fpSwitch == False:
+
+        zai = zai[:-4]
 
 pl=buildPL(zai)
 
@@ -293,7 +296,7 @@ def Bateman(rr):
 
         if nucData.ZAI[i] in burn:
 
-            M[i,i]=-rr['removal'][i]
+            M[i,i]+=-rr['removal'][i]
 
     return tuple(map(tuple, M))
 
@@ -344,7 +347,7 @@ def Qs(N, Ns, Ps, Phi, t, dt):
 
         Psi[i] = 1
 
-        if i%3 == 0:
+        if i%3 == nucData.fuelId:
 
             fis = Ps * np.inner(sf[int(i/3)][t]*sig['v'], np.array(N[0]))
 
@@ -366,7 +369,9 @@ def beta(Psi, lam, N, t):
 
     for i in range(len(N)):
 
-        dN[i] = 1
+        dN[i]  = 1
+        dN[-1] = 0
+
 
         DN = dN * where
 
@@ -383,7 +388,8 @@ def beta2(Gh, lam, N, t):
 
     for i in range(len(N)):
 
-        dN[i] = 1
+        dN[i]  = 1
+        dN[-1] = 0
 
         DN = dN * where
 
@@ -410,6 +416,7 @@ def betaSig(Psi, lam, pert, N, G, id, t):
 
         XS = copy.deepcopy(nucData.xs)
         XS[pert][e][t][id]=1
+        XS['removal'][e][t][id]=1
 
         B = Boltz(M * where, XS, t, lam)
 
@@ -426,6 +433,7 @@ def bateSig(Psi, Phi, pert, N, Ns, id, t, dt):
 
         XS = copy.deepcopy(nucData.xs)
         XS[pert][e][t][id]=1
+        XS['removal'][e][t][id]=1
 
         RR = rr(XS,PSI,Phi,t)
         PL = updatePL(pl,RR)
@@ -445,6 +453,8 @@ def PiSig(Psi, Phi, pert, N, id, t):
 
         XS = copy.deepcopy(nucData.xs)
         XS[pert][e][t][id]=1
+        XS['removal'][e][t][id]=1
+
 
         RR = rr(XS,PSI,Phi,t)
 
@@ -519,11 +529,11 @@ def solveK(N, inter, t):
 
     return float(1 / list(lam)[0])
 
-def crushK(N, t, a,b):
+def crushK(N, sigma, t, a,b):
 
     def f(x):
 
-        F = scipy.linalg.det(boltzL(N, sig, t) - x * boltzF(N, sig, t))
+        F = scipy.linalg.det(boltzL(N, sigma, t) - x * boltzF(N, sigma, t))
 
         return F
 

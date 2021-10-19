@@ -10,10 +10,10 @@ from datetime import datetime
 
 startNuc = datetime.now()
 
-model    = 'UO2'                                # INPUT MODEL
+model    = 'LEU'                                    # INPUT MODEL
 energy   =  2                                       # INPUT ENERGY GROUPS
-PASSI    =  50                                      # INPUT STEP NUMBER
-fpSwitch =  True                                # SWITCH TO FULL NUCLIDE CHART
+PASSI    =  200                                      # INPUT STEP NUMBER
+fpSwitch =  False                                   # SWITCH TO FULL NUCLIDE CHART
 
 ### INITS ###
 
@@ -541,3 +541,10 @@ endNuc = datetime.now()
 
 #    print([str(a.vol)] + [a.zai])
 
+nuc[ZAI.index('922350')].name = 'Uranium-235'
+nuc[ZAI.index('922380')].name = 'Uranium-238'
+
+if model == 'LEU':
+
+    nuc[ZAI.index('50100')].name  = 'Boron-10 (reflector)'
+    nuc[ZAI.index('280580')].name = 'Nickel-58 (CR)'
