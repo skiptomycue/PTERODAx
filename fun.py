@@ -231,6 +231,8 @@ def buildPL(zai):
     #print(PL.passport_list[5].zamid)
     #print(PL.passport_list[5].current_xs)
     #print(rr['fission'][5])
+    print(PL.passport_list[nucData.zai[nucData.fuelId].index('621490')].all_parent)
+    print(PL.passport_list[nucData.zai[nucData.fuelId].index('621490')].creation_dic)
 
     print('Done!\n')
 

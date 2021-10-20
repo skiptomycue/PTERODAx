@@ -10,10 +10,10 @@ from datetime import datetime
 
 startNuc = datetime.now()
 
-model    = 'LEU'                                    # INPUT MODEL
+model    = 'UO2/NEW'                                    # INPUT MODEL
 energy   =  2                                       # INPUT ENERGY GROUPS
-PASSI    =  200                                      # INPUT STEP NUMBER
-fpSwitch =  False                                   # SWITCH TO FULL NUCLIDE CHART
+PASSI    =  50                                      # INPUT STEP NUMBER
+fpSwitch =  1                                   # SWITCH TO FULL NUCLIDE CHART
 
 ### INITS ###
 
@@ -31,7 +31,7 @@ MXT=ST.MicroXSTuple
 
 tempo_het  = np.linspace(0,5,10).tolist() + np.linspace(5,giorni/10,20).tolist()[1:] + np.linspace(giorni/10,giorni,100).tolist()[1:]
 tempo_homo = np.linspace(0, giorni, PASSI)
-tempo = tempo_homo
+tempo = tempo_het
 steps = len(tempo)
 nodo = min([int(len(dep.days)/2),int(len(tempo)/2)])
 print(nodo)
@@ -126,8 +126,8 @@ def rescaleTime(xs, xsTime, newTime):
 
         width = time[j+1] - time[j]
 
-        #newXs.append(xs[j]*(xsTime[j+1]-t)/width+xs[j+1]*(t-xsTime[j])/width)
-        newXs.append(xs[nodo])
+        newXs.append(xs[j]*(xsTime[j+1]-t)/width+xs[j+1]*(t-xsTime[j])/width)
+        #newXs.append(xs[nodo])
 
     return newXs
 
@@ -237,6 +237,10 @@ class Nuclide:
 
             self.name = z
 
+        if z[-1] == '1':
+
+            self.name += ' [metastable]'
+
         self.id  = id
         self.reg = idReg
         self.zai = z
@@ -285,7 +289,7 @@ class Nuclide:
             self.at  = dep.materials['boro'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
 
             for key in xs[UNI[idReg]][z].keys():
-               xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key])  * 0.7 * np.array(CB)).tolist()
+               xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key])  * 0.5 * np.array(CB)).tolist()
 
             self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
 
@@ -318,7 +322,7 @@ def buildAlbe(det):
 
     R_out=(abs(det.detectors['bordo'].tallies[::-1]))
 
-    if model == 'LEU':
+    if model[:3] == 'LEU':
 
         R_out=(abs(det.detectors['bordo'].tallies[::-1])+abs(det.detectors['bordoup'].tallies[::-1])+abs(det.detectors['bordodown'].tallies[::-1]))*[1,1]
 
@@ -343,11 +347,11 @@ def buildAlbe(det):
     CN=[]
     CF=[]
 
-    if model == 'LEU':
+    if model[:3] == 'LEU':
 
-        CB=(np.array(det.detectors['boro'].tallies[::-1]/serpent.volB)/np.array(det.detectors['refl'].tallies[::-1]/serpent.volRefl)*1).tolist()
-        CN=(np.array(det.detectors['Ni'].tallies[::-1]/serpent.volNi)/np.array(det.detectors['cent'].tallies[::-1]/serpent.volCent)*1).tolist()
-        CF=(np.array(det.detectors['meat'].tallies[::-1]/serpent.volMeat)/np.array(det.detectors['fuel'].tallies[::-1]/serpent.volFuel)*1).tolist()
+        CB=(np.array(det.detectors['boro'].tallies[::-1]/serpent.volB)/np.array(det.detectors['REG3'].tallies[::-1]/serpent.volRefl)*1)
+        CN=(np.array(det.detectors['Ni'].tallies[::-1]/serpent.volNi)/np.array(det.detectors['REG1'].tallies[::-1]/serpent.volCent)*1).tolist()
+        CF=(np.array(det.detectors['meat'].tallies[::-1]/serpent.volMeat)/np.array(det.detectors['REG2'].tallies[::-1]/serpent.volFuel)*1).tolist()
 
     return SS, F, CB, CN, CF
 
@@ -385,7 +389,7 @@ def buildXS(xsTime, newTime, ZAI, mdep):
 
             for r in REACTIONS:
 
-                if MXT(zai=int(z),mt=int(r),metastable=0) in mdep[nodo].xsVal[u].keys() or MXT(zai=int(z),mt=int(r),metastable=1) in mdep[nodo].xsVal[u].keys() :
+                if MXT(zai=int(z),mt=int(r),metastable=0) in mdep[nodo].xsVal[u].keys() or MXT(zai=int(z),mt=int(r),metastable=1) in mdep[1].xsVal[u].keys() :
 
                     xs[u][z][r]=[]
 
@@ -544,7 +548,7 @@ endNuc = datetime.now()
 nuc[ZAI.index('922350')].name = 'Uranium-235'
 nuc[ZAI.index('922380')].name = 'Uranium-238'
 
-if model == 'LEU':
+if model[:3] == 'LEU':
 
     nuc[ZAI.index('50100')].name  = 'Boron-10 (reflector)'
     nuc[ZAI.index('280580')].name = 'Nickel-58 (CR)'

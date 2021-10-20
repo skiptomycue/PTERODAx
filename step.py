@@ -14,9 +14,9 @@ import fun
 import nucData
 import serpent
 
-PERT     = ['922350', '922380', '280580', '50100']                                    # INPUT PERTURBATION NUCLIDE
+PERT     = ['922350', '922380']#, '280580', '50100']                                    # INPUT PERTURBATION NUCLIDE
 RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  'nuclide'                                                 # OUTPUT NUCLIDE, KEFF OR NONE
+RESPONSE =  None                                                 # OUTPUT NUCLIDE, KEFF OR NONE
 ND       =  False                                                  # SWITCH ND PERTURBATION
 MT       =  '18'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
@@ -664,12 +664,11 @@ def massPlot(res):
 
     dep = ST.read(nucData.file+'/'+nucData.input+'_dep.m')
 
-    isoFuel = serpent.zais[nucData.model][nucData.fuelId]
+    isoFuel = serpent.zais[nucData.model][nucData.fuelId] + [str(a) for a in serpent.sama]
     isoElse = []
-    m = 'fuel'
+    m = 'Fuel'
 
-    if nucData.model == 'LEU':
-        m = 'Fuel'
+    if nucData.model[:3] == 'LEU':
         isoElse = ['280580', '280600', '50100']
         regElse=[0, 0, 2]
         matElse=['Ni', 'Ni', 'boro']
@@ -697,9 +696,7 @@ def massPlot(res):
 
         ax1.plot(x, y1, 'b', label = 'SIBYL DIRECT')
 
-        if ZAI[k] not in ['922390', '932390', '942400']:
-
-
+        if ZAI[k] not in ['922390', '932390', '942400'] + [str(a) for a in serpent.sama]:
 
             if m in nucData.nuc[k].mat:
 
@@ -1021,7 +1018,7 @@ def fluxSnap(flux, name, UM, **kwargs):
 
     fig, axs = plt.subplots()
 
-    therm=[phi*flux[j] for j in range(len(flux))] + [0]
+    therm=  [0] + [phi*flux[j] for j in range(len(flux))]
 
     axs.step(x, therm, 'b', where='pre', label='SIBYL DIRECT')
     #axs.set_xlim(0, ene)
@@ -1031,7 +1028,7 @@ def fluxSnap(flux, name, UM, **kwargs):
 
         flux = kwargs['serp']
 
-        therm = [flux[j] for j in range(len(flux))] + [0]
+        therm =  [0] + [flux[j] for j in range(len(flux))]
 
         axs.step(x, therm, 'r', where='pre', label='SERPENT')
 
@@ -1099,8 +1096,8 @@ def main(**kwargs):
 
         psi = fun.reshapePsi(res.flux[0])
         serpsi = fun.reshapePsi(nucData.Flux[0])
-        fluxSnap(psi[0],  'Fuel Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[0])
-        fluxSnap(psi[2],  'Reflector Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[2])
+        fluxSnap(psi[nucData.fuelId],  'Fuel Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[nucData.fuelId])
+        fluxSnap(psi[2],  'Moderator Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[2])
 
     startD = 0
     endD   = 0
