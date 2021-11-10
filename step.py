@@ -14,11 +14,11 @@ import fun
 import nucData
 import serpent
 
-PERT     = ['922350', '922380']#, '280580', '50100']                                    # INPUT PERTURBATION NUCLIDE
+PERT     = ['922380']#, '922380']#, '280580', '50100']                                    # INPUT PERTURBATION NUCLIDE
 RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  None                                                 # OUTPUT NUCLIDE, KEFF OR NONE
-ND       =  False                                                  # SWITCH ND PERTURBATION
-MT       =  '18'                                                   # INPUT PERTURBATION XS
+RESPONSE =  'keff'                                                # OUTPUT NUCLIDE, KEFF OR NONE
+ND       =  True                                                  # SWITCH ND PERTURBATION
+MT       =  '102'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
 
 ### INITS ###
@@ -253,7 +253,7 @@ def adjoStep(res, **kwargs):
 
     resp = kwargs['resp']
 
-    if resp == 'keff':
+    if resp == 'keff' and 'xs' not in kwargs.keys() :
 
         ind_3 = np.zeros(len(res.comp[0])).tolist()
         SS=Ns.copy()
@@ -386,6 +386,170 @@ def adjoStep(res, **kwargs):
             sys.stdout.flush()
 
         adjoRes.ind.append([ind_2, dir_1, ind_1, ind_3, sk, Ns])
+
+    if resp == 'keff' and 'xs' in kwargs.keys() :
+
+        ind_1 = np.zeros(ene).tolist()
+        ind_2 = np.zeros(ene).tolist()
+        dir_1 = np.zeros(ene).tolist()
+        ind_3 = np.zeros(ene).tolist()
+
+        RESP = res.keff[-1]
+
+        xs_pert = kwargs['xs']
+
+        for i in range(n-1):
+
+            v = -2 - i
+
+            Psi = res.flux[v]
+
+            Phi = float(res.phi[v])
+
+            C = res.M[v+1]
+
+            k = res.keff[v]
+
+            N = res.comp[v+1]
+            No = res.comp[v]
+
+            psi = fun.reshapePsi(Psi)
+
+            rr = fun.rr(fun.sig, psi, Phi, v)
+
+            # homogeneous adjoint
+
+            A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
+
+            A[1] = Psi
+
+            B = np.zeros(len(A[0])).tolist()
+
+            B[1] = 1
+
+            Gh = np.linalg.inv(A).dot(B)
+
+            adjoRes.homo.append(Gh)
+
+            # keff sens
+
+            #ssk[nucData.ZAI.index('922350')]=-ssk[nucData.ZAI.index('922350')]
+
+            dR = Psi.copy() * 0
+            dR2 = Psi.copy() * 0
+            ai = 0
+            sk = np.zeros(ene).tolist()
+
+            if  i == 0:
+
+                ssk = [(fun.kSens(Gh, Psi, No, k, j, v)) for j in range(len(No))]
+                Ns  = np.array(ssk)
+                Nss = Ns.copy()
+
+                dR = fun.dR(Psi, Gh, N, k, v)
+                ai = (Psi).dot(dR)
+
+                dR2 = fun.dR2(Psi, Gh, N, k, v)
+                dR2[1] = 0
+
+                sk = fun.kSensSig(Gh, Psi, No, k, PERTid, xs_pert, v)
+                skk = sk
+
+                SS = Ns.copy()
+
+            adjoRes.comp.append(Nss)
+
+            adjoRes.ind.append([dir_1, ind_1, ind_2, ind_3, skk, S])
+
+            dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
+
+            SS = Ns1.copy()
+
+            old_stdout = sys.stdout  # backup current stdout
+            sys.stdout = open(os.devnull, "w")
+            Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose() * (dt), np.array(Ns))
+            sys.stdout = old_stdout  # reset old stdout
+
+
+            # adjoint power normalization
+
+            PL = fun.updatePL(fun.pl, rr )
+            R = fun.onixR(PL)
+            Ps = (fun.I([Ns1, SS], [No, N],  R, dt) + ai) / P
+
+            adjoRes.pow.append(Ps)
+
+            # adjoint source
+
+            B = -dR -np.array(fun.Qs([No, N], [Ns1, SS], Ps, Phi, v, dt))
+
+            adjoRes.source.append(np.array(B))
+
+            # adjoflux-shape algebra
+
+            A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
+
+
+            #A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
+            A[1] = Gh
+
+            B[1] = 0
+
+            Gp = np.linalg.inv(A).dot(np.array(B))
+
+            b = (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gp)) / (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gh))
+
+            G = Gp - b * Gh
+
+            adjoRes.flux.append(G)
+
+            A = fun.Boltz(No * where, sig, v, 1 / k)
+            B = np.zeros(len(A[0])) -dR2
+            A[1] = Psi
+            B[1] = 0
+            G2 = np.linalg.inv(A).dot(np.array(B))
+
+            # step condition
+
+            lam = 1 / k
+
+            Beta  = fun.beta(Psi, lam, No, v)
+            Beta2 = fun.beta(Gh, lam, No, v)
+
+            Pi = rr['fission'].copy()*sig['v']
+
+            Ns = [Ns1[j] + (np.inner(G, Beta[j]) - Ps * Pi[j]  + np.inner(G2, Beta2[j])) for j in range(Beta.shape[0])]
+            Nss = [Ns[j] for j in range(Beta.shape[0])]
+
+            # SENSITIVITY
+
+            Beta_sig  =  fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)
+            Bate_sig  =  fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
+            Beta2_sig =  fun.beta2Sig(Gh, lam, xs_pert, No, G2, PERTid, v)
+            Pi_sig    = -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Ps
+            #skk       =  fun.kSensSig(Gh, Psi, No, k, PERTid, xs_pert, v)
+
+
+            S = [S[e] + (sk[e] + Bate_sig[e] + Beta_sig[e] + Beta2_sig[e] + Pi_sig[e]) * (sig[xs_pert][e][v][PERTid] / RESP) ** 0 for e in range(ene)]
+
+
+            ind_1= [ind_1[e] + Beta_sig[e] for e in range(ene)]
+            ind_2= [ind_2[e] + Pi_sig[e] for e in range(ene)]
+            ind_3= [ind_3[e] + Beta2_sig[e] for e in range(ene)]
+            dir_1= [dir_1[e] + Bate_sig[e] for e in range(ene)]
+            #ind_1= [ind_1[e] + Beta_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+            #ind_2= [ind_2[e] + Pi_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+            #ind_3= [ind_3[e] + Beta2_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+            #dir_1= [dir_1[e] + Bate_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+
+            # Ns = [Ns1[j] - (np.inner(G, Beta[j]) + (Ps * Pi[j])) + (fun.kSens(Gh, Psi,  N, k , j, v)) for j in range(Beta.shape[0])]
+            # adjoRes.ind.append([ind_2,dir_1,ind_1, sk, Nss])
+
+            print('\t' + str(math.ceil(i / n * 100)) + "% complete", end='\r')
+            sys.stdout.flush()
+
+        adjoRes.ind.append([dir_1, ind_1, ind_2, ind_3, skk, S])
+
 
     elif resp == 'nuclide' and 'xs' not in kwargs.keys():
 
@@ -801,14 +965,24 @@ def paraPlot(para, name, **kwargs):
 
     fig, ax1 = plt.subplots()
 
+    x = nucData.tempo[:len(y1)]
+    x2 = kwargs['paraserp'][0]
+
+    ax1.set(xlabel='BU (days)', ylabel='SIBYL '+name, title = name + ' BU evolution')
+
+    if nucData.model=='UO2/NEW':
+
+        x  = np.array(x)/2500*60
+        x2 = np.array(x2)/2500*60
+        ax1.set(xlabel='BU (GW/dt)', ylabel='SIBYL '+name, title = name + ' BU evolution')
+
     if 'serp' in kwargs.keys():
         if kwargs['serp'] == True:
 
             ax2 = ax1.twinx()
             ax2.set(xlabel='BU (days)', ylabel='SERPENT '+name)
 
-            x2 = kwargs['paraserp'][0]
-            y2 = np.array([a for a in kwargs['paraserp'][1] ])
+            y2 = np.array([a-0.05 for a in kwargs['paraserp'][1] ])*1.05
 
             jump = abs(max(y2) - min(y2))
             ax1.set_ylim(max(y1) - jump * 1.1, max(y1) * 1.005)
@@ -818,9 +992,7 @@ def paraPlot(para, name, **kwargs):
             ax2.legend(loc='upper center')
 
 
-    x = nucData.tempo[:len(y1)]
 
-    ax1.set(xlabel='BU (days)', ylabel='SIBYL '+name, title = name + ' BU evolution')
     ax1.grid()
 
     ax1.plot(x, y1, 'b', label = 'SIBYL DIRECT')
@@ -1035,28 +1207,50 @@ def fluxSnap(flux, name, UM, **kwargs):
     #axs.set_yscale('log')
     axs.set_xscale('log')
     axs.legend(loc='upper right')
-    axs.set_xlim(1E-9, 1E+1)
+    axs.set_xlim(1E-9, 1E+2)
 
     fig.savefig(model+'/flux/' + name + '_snap.png')
 
-def bunSnap(resu, res, name, xs, BOL):
+def bunSnap(resu, res, resp, name, xs, BOL):
 
     x = nucData.grid
+    c = 1
+    pcm = 1
 
     fig, axs = plt.subplots()
 
-    lin = [(0, ()), (0, ()), (0, ()), (0, (2,2))]
-    lab = ['at. evolution', 'flux spectrum', 'power', 'TOTAL DPT']
-    col = ['green', 'orange', 'brown', 'blue']
+    lin = [(0, ()), (0, ()), (0, ())]
+    lab = ['at. evolution', 'flux spectrum', 'power']
+    col = ['green', 'orange', 'brown']
+
+    if resp=='nuclide':
+
+        c = nucData.getMM(ZAI[respId]) / 6.022E+23
+        resp = nucData.nuc[respId].name
+        sibyl = res.pert['atoms']
+        lab.extend(['TOTAL DPT'])
+        lin.extend([(0, (2,2))])
+        col.extend(['blue'])
+        title = 'mass change [g]'
+
+    if resp == 'keff':
+
+        pcm = 1E+5
+        sibyl = res.pert['keff']
+        lab.extend(['flux adjoint','k-sens', 'TOTAL DPT'])
+        lin.extend([(0, ()), (0, ()), (0, (2,2))])
+        col.extend(['gold','m', 'blue'])
+        title = 'reactivity change [pcm]'
 
     j = 0
 
     for flux in resu:
 
-        y = np.array([flux[e] * sig[MT][e][nodo][PERTid] * (pert-1)  for e in range(ene)] + [0]) *nucData.getMM(RESP_NUC)/6.022E+23
+        #y = np.array([flux[e] * sig[MT][e][nodo][PERTid] * (pert-1)  for e in range(ene)] + [0]) *nucData.getMM(RESP_NUC)/6.022E+23
+        y = np.array( [0] + [flux[e] * sig[MT][e][nodo][PERTid] * (pert-1)  for e in range(ene)] ) * c
         axs.step(x, y, col[j], linestyle= lin[j], where = 'pre', label=lab[j])
-        tit = 'EOL '+nucData.nuc[respId].name+' Sensitivity to '+nucData.nuc[PERTid].name+' '+xs+' cross section\n'
-        axs.set(xlabel='Energy [MeV]', ylabel='sensitivity', title=tit)
+        tit = 'EOL '+resp+' Sensitivity to '+nucData.nuc[PERTid].name+' '+xs+' cross section\n'
+        axs.set(xlabel='Energy [MeV]', ylabel=title, title=tit)
         #axs.set_yscale('log')
         axs.set_xscale('log')
 
@@ -1065,17 +1259,17 @@ def bunSnap(resu, res, name, xs, BOL):
     RESP = res.comp[-1][respId]
     #y2 = [res.pert['atoms'][e]/RESP/(pert-1) for e in range(ene)] + [0]
     #y2 = [res.pert['atoms'][e]/(sig[MT][e][nodo][PERTid]*(pert-1)) for e in range(ene)] + [0]
-    y2 = np.array(res.pert['atoms'] + [0]) *nucData.getMM(RESP_NUC)/6.022E+23
+    #y2 = np.array(res.pert['atoms'] + [0]) *nucData.getMM(RESP_NUC)/6.022E+23
+    y2 = (np.array([0] + sibyl)) * c
+
     axs.step(x, y2, 'red', linestyle=lin[-1], where='pre', label='SIBYL DIRECT')
     axs.legend(loc='best')
-    axs.set_xlim(1E-9, 1E+1)
-
+    axs.set_xlim(1E-9, 1E+2)
 
     print(sum(y))
     print(sum(y2))
 
-    fig.savefig(model+'/sensitivity_to_'+name+'_snap_'+BOL+'_'+xs+'.png')
-
+    fig.savefig(model+'/'+resp+'_sensitivity_to_'+name+'_snap_'+BOL+'_'+xs+'.png')
 
 ### MAIN ###
 
@@ -1126,7 +1320,7 @@ def main(**kwargs):
 
             adjoRes=adjoStep(res, resp=resp, xs=MT)
 
-            bunSnap(adjoRes.ind[0], res, PERT[0], reac, 'BOL')
+            bunSnap(adjoRes.ind[0], res, resp, PERT[0], reac, 'BOL')
             #bunSnap(adjoRes.ind[-2], res, PERT[-2], reac, 'EOL')
 
         else:

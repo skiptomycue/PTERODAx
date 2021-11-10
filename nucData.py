@@ -10,10 +10,10 @@ from datetime import datetime
 
 startNuc = datetime.now()
 
-model    = 'UO2/NEW'                                    # INPUT MODEL
-energy   =  2                                       # INPUT ENERGY GROUPS
-PASSI    =  50                                      # INPUT STEP NUMBER
-fpSwitch =  1                                   # SWITCH TO FULL NUCLIDE CHART
+model    = 'UO2'                                    # INPUT MODEL
+energy   =  44                                       # INPUT ENERGY GROUPS
+PASSI    =  5                                      # INPUT STEP NUMBER
+fpSwitch =  0                                  # SWITCH TO FULL NUCLIDE CHART
 
 ### INITS ###
 
@@ -31,10 +31,10 @@ MXT=ST.MicroXSTuple
 
 tempo_het  = np.linspace(0,5,10).tolist() + np.linspace(5,giorni/10,20).tolist()[1:] + np.linspace(giorni/10,giorni,100).tolist()[1:]
 tempo_homo = np.linspace(0, giorni, PASSI)
-tempo = tempo_het
+tempo = tempo_homo
 steps = len(tempo)
 nodo = min([int(len(dep.days)/2),int(len(tempo)/2)])
-print(nodo)
+
 ### SERPENT ###
 
 REACTIONS=serpent.REACTIONS
@@ -324,7 +324,7 @@ def buildAlbe(det):
 
     if model[:3] == 'LEU':
 
-        R_out=(abs(det.detectors['bordo'].tallies[::-1])+abs(det.detectors['bordoup'].tallies[::-1])+abs(det.detectors['bordodown'].tallies[::-1]))*[1,1]
+        R_out=(abs(det.detectors['bordo'].tallies[::-1])+abs(det.detectors['bordoup'].tallies[::-1])+abs(det.detectors['bordodown'].tallies[::-1]))
 
     RR=np.array([[R[0,1], -R[0,0], zero],[-R[0,1], (R[0,0]+R[1,1]), -R[1,0]],[zero, -R[1,1], R[1,0]+R_out]])
 

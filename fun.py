@@ -231,8 +231,8 @@ def buildPL(zai):
     #print(PL.passport_list[5].zamid)
     #print(PL.passport_list[5].current_xs)
     #print(rr['fission'][5])
-    print(PL.passport_list[nucData.zai[nucData.fuelId].index('621490')].all_parent)
-    print(PL.passport_list[nucData.zai[nucData.fuelId].index('621490')].creation_dic)
+    #print(PL.passport_list[nucData.zai[nucData.fuelId].index('621490')].all_parent)
+    #print(PL.passport_list[nucData.zai[nucData.fuelId].index('621490')].creation_dic)
 
     print('Done!\n')
 
@@ -406,6 +406,44 @@ def pi(Psi, Phi):
 
     return (sf).dot(np.array(Psi)) * Phi
 
+def dR(Psi, Gh, N, k, t):
+
+    dR = []
+
+    for i in range(len(Psi)):
+        dPsi = np.zeros(len(Psi))
+        dPsi[i] = 1
+
+        num1 = tramezzino(Gh, dPsi, np.matrix(Boltz(N * where, sig, t, 1/k )))
+        num = tramezzino(Gh, Psi, np.matrix(Boltz(N * where, sig, t, 1/k )))
+
+        den1 = tramezzino(Gh, dPsi, boltzF(N * where, sig, t))/k
+        den = tramezzino(Gh, Psi, boltzF(N * where, sig, t))/k
+
+        #dR.append(num1/den)
+        dR.append((num1*den-num*den1)/(den**2))
+
+    return np.array(dR)*k
+
+def dR2(Psi, Gh, N, k, t):
+
+    dR = []
+
+    for i in range(len(Psi)):
+        dGh = np.zeros(len(Psi))
+        dGh[i] = 1
+
+        num1 = tramezzino(dGh, Psi, np.matrix(Boltz(N * where, sig, t, 1/k )))
+        num = tramezzino(Gh, Psi, np.matrix(Boltz(N * where, sig, t, 1/k )))
+
+        den1 = tramezzino(dGh, Psi, boltzF(N * where, sig, t))/k
+        den = tramezzino(Gh, Psi, boltzF(N * where, sig, t))/k
+
+        #dR.append(num1/den)
+        dR.append((num1*den-num*den1)/(den**2))
+
+    return np.array(dR)*k
+
 ### ND ###
 
 def betaSig(Psi, lam, pert, N, G, id, t):
@@ -423,6 +461,24 @@ def betaSig(Psi, lam, pert, N, G, id, t):
         B = Boltz(M * where, XS, t, lam)
 
         BETA.append(tramezzino(G,Psi,B))
+
+    return np.array(BETA)
+
+def beta2Sig(Gh, lam, pert, N, G2, id, t):
+
+    M = N.copy()
+    BETA = []
+    M[-1] = 0
+
+    for e in range(ene):
+
+        XS = copy.deepcopy(nucData.xs)
+        XS[pert][e][t][id]=1
+        XS['removal'][e][t][id]=1
+
+        B = Boltz(M * where, XS, t, lam).transpose()
+
+        BETA.append(tramezzino(G2,Gh,B))
 
     return np.array(BETA)
 
@@ -464,43 +520,28 @@ def PiSig(Psi, Phi, pert, N, id, t):
 
     return np.array(PI)
 
-def dR(Psi, Gh, N, k, t):
+def kSensSig(Gh, Psi, N, k, pertId, pertMT, t):
 
-    dR = []
+    M = N.copy()
+    sens = []
+    M[-1] = 0
 
-    for i in range(len(Psi)):
-        dPsi = np.zeros(len(Psi))
-        dPsi[i] = 1
+    for e in range(ene):
 
-        num1 = tramezzino(Gh, dPsi, np.matrix(Boltz(N * where, sig, t, 1/k )))
-        num = tramezzino(Gh, Psi, np.matrix(Boltz(N * where, sig, t, 1/k )))
+        XS = copy.deepcopy(nucData.xs)
+        XS[pertMT][e][t][pertId]=1
+        XS['removal'][e][t][pertId]=1
 
-        den1 = tramezzino(Gh, dPsi, boltzF(N * where, sig, t))/k
-        den = tramezzino(Gh, Psi, boltzF(N * where, sig, t))/k
+        num1 = tramezzino(Gh, Psi, np.matrix(Boltz(M*where, XS, t, 1/k)))
+        num = tramezzino(Gh, Psi, np.matrix(Boltz(N*where, sig, t, 1/k)))
 
-        #dR.append(num1/den)
-        dR.append((num1*den-num*den1)/(den**2))
+        den1 = tramezzino(Gh, Psi, boltzF(M*where, XS, t))/k
+        den = tramezzino(Gh, Psi, boltzF(N*where, sig, t))/k
 
-    return np.array(dR)*k
+        sens.append((num1*den-num*den1)/(den**2)*k)
+        #sens = -num1/den*k
 
-def dR2(Psi, Gh, N, k, t):
-
-    dR = []
-
-    for i in range(len(Psi)):
-        dGh = np.zeros(len(Psi))
-        dGh[i] = 1
-
-        num1 = tramezzino(dGh, Psi, np.matrix(Boltz(N * where, sig, t, 1/k )))
-        num = tramezzino(Gh, Psi, np.matrix(Boltz(N * where, sig, t, 1/k )))
-
-        den1 = tramezzino(dGh, Psi, boltzF(N * where, sig, t))/k
-        den = tramezzino(Gh, Psi, boltzF(N * where, sig, t))/k
-
-        #dR.append(num1/den)
-        dR.append((num1*den-num*den1)/(den**2))
-
-    return np.array(dR)*k
+    return np.array(sens)
 
 ### RICERCA AUTOVALORE ###
 
@@ -622,6 +663,8 @@ def moveCR(N,t, k):
 
     return SM
 
+
+
 def getMM(zai):
 
     z=zai[0:2]
@@ -634,13 +677,13 @@ def plotBU(A, name):
 
     fig, axs = plt.subplots()
 
-    im = axs.imshow(C, cmap='Reds',  norm=LogNorm(vmin=1E-4, vmax=1E+1))
+    im = axs.imshow(C, cmap='Reds',  norm=LogNorm(vmin=1E-4, vmax=1E+5))
     fig.colorbar(im, orientation='vertical')
 
     if nucData.energy == 44:
 
-        plt.setp(axs, xticks=[0, 21, 43, 63, 87, 107, 131], xticklabels=['0','22','44','22','44','22','44'])
-        plt.setp(axs, yticks=[0, 21, 43, 63, 87, 107, 131], yticklabels=['0','22','44','22','44','22','44'])
+        plt.setp(axs, xticks=[0, 21, 43, 65, 87, 109, 131], xticklabels=['0','22','44','22','44','22','44'])
+        plt.setp(axs, yticks=[0, 21, 43, 65, 87, 109, 131], yticklabels=['0','22','44','22','44','22','44'])
 
     fig.savefig(name+'.png')
 
