@@ -10,10 +10,11 @@ from datetime import datetime
 
 startNuc = datetime.now()
 
-model    = 'UO2'                                    # INPUT MODEL
-energy   =  44                                       # INPUT ENERGY GROUPS
-PASSI    =  5                                      # INPUT STEP NUMBER
-fpSwitch =  0                                  # SWITCH TO FULL NUCLIDE CHART
+model     = 'LEU'                                    # INPUT MODEL
+energy    =  2                                       # INPUT ENERGY GROUPS
+PASSI     =  50                                      # INPUT STEP NUMBER
+fpSwitch  =  1                                       # SWITCH TO FULL NUCLIDE CHART
+hetSwitch =  0                                       # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
 
 ### INITS ###
 
@@ -227,7 +228,7 @@ def xsDef(**kwargs):
 
 class Nuclide:
 
-    def __init__(self, zlist, idReg, z, mat, vol, xs, id, CB, **kwargs):
+    def __init__(self, zlist, idReg, z, mat, vol, xs, id, CB, CF, CN, **kwargs):
 
         if z[-1] in ['0','1']:
 
@@ -289,10 +290,31 @@ class Nuclide:
             self.at  = dep.materials['boro'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
 
             for key in xs[UNI[idReg]][z].keys():
-               xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key])  * 0.5 * np.array(CB)).tolist()
+               xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key])  * 1.5 * np.array(CB)).tolist()
 
             self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
 
+        if 'Fuel' in mat and int(z) > 300000 and z not in ['621481']+[str(a) for a in serpent.sama] and hetSwitch == True :
+
+            self.mat = ['Fuel']
+            self.vol = serpent.volMeat
+            self.at  = dep.materials['Fuel'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
+
+            for key in xs[UNI[idReg]][z].keys():
+               xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key]) / self.vol * VOL[idReg] * np.array(CF)).tolist()
+
+            self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
+
+        if 'Ni' in mat and z in ['280580', '280600'] and hetSwitch == True:
+
+            self.mat = ['Ni']
+            self.vol = serpent.volNi
+            self.at  = dep.materials['Ni'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
+
+            for key in xs[UNI[idReg]][z].keys():
+               xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key]) / self.vol * VOL[idReg]  * np.array(CN)).tolist()
+
+            self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
 
         #print(self.vol)
 
@@ -349,9 +371,9 @@ def buildAlbe(det):
 
     if model[:3] == 'LEU':
 
-        CB=(np.array(det.detectors['boro'].tallies[::-1]/serpent.volB)/np.array(det.detectors['REG3'].tallies[::-1]/serpent.volRefl)*1)
-        CN=(np.array(det.detectors['Ni'].tallies[::-1]/serpent.volNi)/np.array(det.detectors['REG1'].tallies[::-1]/serpent.volCent)*1).tolist()
-        CF=(np.array(det.detectors['meat'].tallies[::-1]/serpent.volMeat)/np.array(det.detectors['REG2'].tallies[::-1]/serpent.volFuel)*1).tolist()
+        CB=(np.array(det.detectors['boro'].tallies[::-1]/serpent.volB)/np.array(det.detectors[DET[2]].tallies[::-1]/serpent.volRefl)*1).tolist()
+        CN=(np.array(det.detectors['Ni'].tallies[::-1]/serpent.volNi)/np.array(det.detectors[DET[0]].tallies[::-1]/serpent.volCent)*1).tolist()
+        CF=(np.array(det.detectors['meat'].tallies[::-1]/serpent.volMeat)/np.array(det.detectors[DET[1]].tallies[::-1]/serpent.volFuel)*1).tolist()
 
     return SS, F, CB, CN, CF
 
@@ -409,7 +431,7 @@ def buildXS(xsTime, newTime, ZAI, mdep):
 
     return xs
 
-def buildNuc(zai, xs, CB):
+def buildNuc(zai, xs, CB, CF, CN):
 
     nuc = []
     MAT = []
@@ -436,7 +458,7 @@ def buildNuc(zai, xs, CB):
                     nu = nuPu
                     v  = vPu
 
-                elem = Nuclide(zai, i, z, mat[i], vol[i], xs, j, CB, nu=nu, v=v)
+                elem = Nuclide(zai, i, z, mat[i], vol[i], xs, j, CB, CF, CN, nu=nu, v=v)
                 nuc.append(elem)
                 MAT.append(elem.mat)
                 NOM.append(elem.name)
@@ -445,7 +467,7 @@ def buildNuc(zai, xs, CB):
         else:
 
             for z in zai[i]:
-                elem = Nuclide(zai, i, z, mat[i], vol[i], xs, j, CB)
+                elem = Nuclide(zai, i, z, mat[i], vol[i], xs, j, CB, CF, CN)
                 nuc.append(elem)
                 MAT.append(elem.mat)
                 NOM.append(elem.name)
@@ -516,10 +538,12 @@ def main():
     xs   = buildXS(time, tempo, ZAI, mdep)
     Albe = rescaleTime(Albe, time, tempo)
     corrBoro = np.array(rescaleTime(corrBoro, time, tempo))
+    corrFuel = np.array(rescaleTime(corrFuel, time, tempo))
+    corrNi   = np.array(rescaleTime(corrNi, time, tempo))
 
     ### NUCLIDES ###
 
-    nuc, MAT, NOM = buildNuc(zai, xs, corrBoro)
+    nuc, MAT, NOM = buildNuc(zai, xs, corrBoro, corrFuel, corrNi)
     sig = buildSig(nuc)
 
     ### VECTORS ###
