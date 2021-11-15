@@ -20,6 +20,7 @@ RESPONSE =  None                                                # OUTPUT NUCLIDE
 ND       =  True                                                  # SWITCH ND PERTURBATION
 MT       =  '102'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
+resetK   =  1
 
 ### INITS ###
 
@@ -53,13 +54,19 @@ def zeroStep(At, sig):
 
     res = fun.Results()
 
-    N = np.array(At) * where #/ np.array([nucData.VOL] * len(At)).transpose()
-
     # flux shape algebra
 
+    N = np.array(At) * where  # / np.array([nucData.VOL] * len(At)).transpose()
     k = fun.crushK(N, sig, 0, 0.5, 2)
     #k=fun.findK(N, 0)
     print(k)
+
+    if resetK == True:
+
+        resK = k
+        SM   = fun.moveCR(At,0,resK)
+        N    = SM.dot(At) * where
+
 
     A  = fun.Boltz(N, sig, 0, 1 / k)
     AA = fun.Boltz(N, sig, 0, 1 / k, ribalta=True)
@@ -101,11 +108,11 @@ def zeroStep(At, sig):
 
     fun.plotBU(np.matrix(C), 'Depletion_mtx')
 
-    return res
+    return res, resK
 
 def directStep(At, sig):
 
-    res = zeroStep(At,sig)
+    res, resK = zeroStep(At,sig)
 
     res.comp.append(At)
 
@@ -122,16 +129,22 @@ def directStep(At, sig):
         At1 = onix.salameche.CRAM16(np.matrix(res.M[i])*(dt), np.array(At))
         sys.stdout = old_stdout  # reset old stdout
 
+        if resetK == True:
 
-        res.comp.append(At1.tolist())
+            k = resK
+            SM = fun.moveCR(At1, 0, resK)
+            At1 = SM.dot(At1)
+            N = np.array(At1) * where
+
+        else:
+
+            N = np.array(At) * where  # / np.array([nucData.VOL] * len(At)).transpose()
+            k = fun.crushK(N, sig, i, 0.3, 3)
+            #k=fun.findK(N, i)
+
         At = At1
-
-        N = np.array(At) * where #/ np.array([nucData.VOL] * len(At)).transpose()
-
-        # updated flux shape algebra
-
-        k = fun.crushK(N, sig, i, 0.3, 3)
-        #k=fun.findK(N, i)
+        res.comp.append(At1.tolist())
+        print(i)
 
         A = fun.Boltz(N, sig, i, 1 / k)
 
@@ -1282,7 +1295,7 @@ def main(**kwargs):
     printRes(res, keff=True, comp = False, phi = False, flux = False)
 
 
-    if nucData.fpSwitch == True:
+    if nucData.fpSwitch == True or resetK == True:
 
         massPlot(res)
         paraPlot(res.keff, 'keff', serp=True, paraserp=[nucData.time, nucData.keff])

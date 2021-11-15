@@ -10,10 +10,10 @@ from datetime import datetime
 
 startNuc = datetime.now()
 
-model     = 'LEU'                                    # INPUT MODEL
+model     = 'LEU/OLD'                                    # INPUT MODEL
 energy    =  2                                       # INPUT ENERGY GROUPS
 PASSI     =  50                                      # INPUT STEP NUMBER
-fpSwitch  =  1                                       # SWITCH TO FULL NUCLIDE CHART
+fpSwitch  =  0                                       # SWITCH TO FULL NUCLIDE CHART
 hetSwitch =  0                                       # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
 
 ### INITS ###
@@ -290,7 +290,7 @@ class Nuclide:
             self.at  = dep.materials['boro'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
 
             for key in xs[UNI[idReg]][z].keys():
-               xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key])  * 1.5 * np.array(CB)).tolist()
+               xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key])  * 1 * np.array(CB)).tolist()
 
             self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
 

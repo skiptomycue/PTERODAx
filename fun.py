@@ -608,7 +608,7 @@ def moveCR(N,t, k):
     q = nucData.ZAI.index('280600')
 
     a = 0
-    b = 2
+    b = 3
 
     MM = N.copy()
 
@@ -623,14 +623,22 @@ def moveCR(N,t, k):
 
     def f(x):
 
-        F = scipy.linalg.det(Boltz(g(x)*where, sig,t,1/k))
+        F = scipy.linalg.det(Boltz(g(x)*where, sig, t, 1/k))
 
         return F
+
+    #print(f(a))
+    #print(f(b))
+    #print(Boltz(g(a)*where, sig, t, 1/k))
+    #print(Boltz(g(b)*where, sig, t, 1/k))
+
 
     y = scipy.optimize.brentq(f, a, b, rtol=1E-10)
 
     MM[p]=N[p]*y
     MM[q]=N[q]*y
+
+    print(MM[p])
 
     def buildSM():
 
