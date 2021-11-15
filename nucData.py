@@ -10,8 +10,8 @@ from datetime import datetime
 
 startNuc = datetime.now()
 
-model     = 'LEU/OLD'                                    # INPUT MODEL
-energy    =  2                                       # INPUT ENERGY GROUPS
+model     = 'UO2'                                    # INPUT MODEL
+energy    =  44                                       # INPUT ENERGY GROUPS
 PASSI     =  50                                      # INPUT STEP NUMBER
 fpSwitch  =  0                                       # SWITCH TO FULL NUCLIDE CHART
 hetSwitch =  0                                       # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL

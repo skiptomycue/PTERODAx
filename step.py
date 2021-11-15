@@ -16,11 +16,11 @@ import serpent
 
 PERT     = ['922380']#, '922380']#, '280580', '50100']                                    # INPUT PERTURBATION NUCLIDE
 RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  None                                                # OUTPUT NUCLIDE, KEFF OR NONE
+RESPONSE =  'keff'                                                # OUTPUT NUCLIDE, KEFF OR NONE
 ND       =  True                                                  # SWITCH ND PERTURBATION
 MT       =  '102'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
-resetK   =  1
+resetK   =  0
 
 ### INITS ###
 
@@ -52,8 +52,8 @@ plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
 
 def zeroStep(At, sig):
 
-    res = fun.Results()
-
+    res  = fun.Results()
+    resK = 1
     # flux shape algebra
 
     N = np.array(At) * where  # / np.array([nucData.VOL] * len(At)).transpose()
@@ -106,7 +106,7 @@ def zeroStep(At, sig):
 
     res.M.append(C)
 
-    fun.plotBU(np.matrix(C), 'Depletion_mtx')
+    #fun.plotBU(np.matrix(C), 'Depletion_mtx')
 
     return res, resK
 
@@ -144,8 +144,7 @@ def directStep(At, sig):
 
         At = At1
         res.comp.append(At1.tolist())
-        print(i)
-
+        
         A = fun.Boltz(N, sig, i, 1 / k)
 
         A[-1] = np.ones(ene*reg)
