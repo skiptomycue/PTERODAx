@@ -14,10 +14,10 @@ import fun
 import nucData
 import serpent
 
-PERT     = ['922380']#, '922380']#, '280580', '50100']                                    # INPUT PERTURBATION NUCLIDE
+PERT     = ['922350', '922380', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
 RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  'keff'                                                # OUTPUT NUCLIDE, KEFF OR NONE
-ND       =  True                                                  # SWITCH ND PERTURBATION
+RESPONSE =  'nuclide'                                                # OUTPUT NUCLIDE, KEFF OR NONE
+ND       =  False                                                  # SWITCH ND PERTURBATION
 MT       =  '102'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
 resetK   =  0
@@ -66,6 +66,7 @@ def zeroStep(At, sig):
         resK = k
         SM   = fun.moveCR(At,0,resK)
         N    = SM.dot(At) * where
+        res.ind.append(SM)
 
 
     A  = fun.Boltz(N, sig, 0, 1 / k)
@@ -144,7 +145,8 @@ def directStep(At, sig):
 
         At = At1
         res.comp.append(At1.tolist())
-        
+        res.ind.append(SM)
+
         A = fun.Boltz(N, sig, i, 1 / k)
 
         A[-1] = np.ones(ene*reg)
@@ -253,13 +255,16 @@ def adjoStep(res, **kwargs):
     adjoRes.source.append(np.zeros(len(res.flux[0].tolist())).tolist())
     adjoRes.flux.append(np.zeros(len(res.flux[0].tolist())).tolist())
 
-    Ns = np.zeros(len(res.comp[0]))
+    Ns  = np.zeros(len(res.comp[0]))
     Ns1 = Ns.copy()
 
-    sk=np.zeros(len(res.comp[0])).tolist()
+    sk  = np.zeros(len(res.comp[0])).tolist()
+    skk = np.zeros(len(res.comp[0])).tolist()
+
     ind_1=np.zeros(len(res.comp[0])).tolist()
     ind_2=np.zeros(len(res.comp[0])).tolist()
     dir_1=np.zeros(len(res.comp[0])).tolist()
+    dir_2=np.zeros(len(res.comp[0])).tolist()
 
     S = np.zeros(ene).tolist()
 
@@ -399,7 +404,7 @@ def adjoStep(res, **kwargs):
 
         adjoRes.ind.append([ind_2, dir_1, ind_1, ind_3, sk, Ns])
 
-    if resp == 'keff' and 'xs' in kwargs.keys() :
+    elif resp == 'keff' and 'xs' in kwargs.keys() :
 
         ind_1 = np.zeros(ene).tolist()
         ind_2 = np.zeros(ene).tolist()
@@ -562,12 +567,10 @@ def adjoStep(res, **kwargs):
 
         adjoRes.ind.append([dir_1, ind_1, ind_2, ind_3, skk, S])
 
-
     elif resp == 'nuclide' and 'xs' not in kwargs.keys():
 
         Ns[respId] = 1
         Nss = Ns.copy()
-        Ns1 = Ns.copy()
 
         SS=Ns.copy()
 
@@ -579,7 +582,7 @@ def adjoStep(res, **kwargs):
 
             Phi = float(res.phi[v])
 
-            C = res.M[v]
+            C = np.matrix(res.M[v]).transpose()
 
             k = res.keff[v]
 
@@ -589,6 +592,8 @@ def adjoStep(res, **kwargs):
             psi = fun.reshapePsi(Psi)
 
             rr = fun.rr(fun.sig, psi, Phi,v)
+
+            SM = res.ind[v+1].transpose() #- np.diag(np.ones(len(N)))
 
             # homogeneous adjoint
 
@@ -608,7 +613,7 @@ def adjoStep(res, **kwargs):
 
             adjoRes.comp.append(Ns)
 
-            adjoRes.ind.append([ind_2,dir_1,ind_1, Ns])
+            adjoRes.ind.append([ind_2,dir_1,ind_1, skk, dir_2, Nss])
 
             dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
 
@@ -617,8 +622,13 @@ def adjoStep(res, **kwargs):
             old_stdout = sys.stdout  # backup current stdout
             sys.stdout = open(os.devnull, "w")
             #Ns1 = odeint(fun.ODE2b, Ns, time, C).tolist()[::-1]
-            Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose()*(dt), np.array(Ns))
+            Ns2 = onix.salameche.CRAM16((C)*(dt), np.array(Ns))
             sys.stdout = old_stdout  # reset old stdout
+
+
+            #Ns1  = onix.salameche.CRAM16((-SM)*(dt), np.array(Ns2))
+            Ns1 = SM.dot(Ns2)
+            #Ns1 = Ns2
 
             # adjoint power normalization
 
@@ -638,20 +648,39 @@ def adjoStep(res, **kwargs):
 
             A = fun.Boltz(No * where, sig, v, 1/k).transpose()
 
-            A[-1]=fun.boltzF(No*where, sig, v).dot(Psi)
-            #A[-1]=Gh
+            p = nucData.ZAI.index('280580')
+            q = nucData.ZAI.index('280600')
+
+            dNc = np.zeros(len(N))
+            dNc[p] = 1#No[p]
+            dNc[q] = 1#No[q]
+
+            #A[0]=fun.boltzF(No*where, sig, v).dot(Psi)
+            #A[0]=fun.Boltz(dNc*where, sig, v, 1/k).dot(Psi)
+
+            A[-1]=Gh
 
             B[-1]=0
 
             Gp = np.linalg.inv(A).dot(np.array(B))
 
             b = (fun.boltzF(No*where, sig, v).dot(Psi).dot(Gp))/(fun.boltzF(No*where, sig, v).dot(Psi).dot(Gh))
+            c = (fun.Boltz(dNc * where, sig, v, 1 / k).dot(Psi).dot(Gp)) / (fun.Boltz(dNc * where, sig, v, 1 / k).dot(Psi).dot(Gh))
 
-            G = Gp - b*Gh
+            G = Gp + c*Gh*1 -b*Gh*0
 
             adjoRes.flux.append(G)
 
             # step condition
+
+
+            if resetK == True:
+
+                IMP  = (Ns[p] * No[p] + Ns[q] * No[q]) / ((fun.kSens(Gh, Psi, No, k, p, v)) * No[p] + (fun.kSens(Gh, Psi, No, k, q, v)) * No[q])
+                IMP2 = Ns[p] / (fun.kSens(Gh, Psi, No, k, p, v))
+                skk  = [(fun.kSens(Gh, Psi, No, k, j, v)) * IMP * (No[j]/No[p])**0 for j in range(len(N))]
+                ssk  = [fun.boltzF(No * where, sig, v, ).dot(Psi).dot(G) * (fun.kSens(Gh, Psi, No, k, j, v))  for j in range(len(N))]
+                sk   = [sk[j] + skk[j] for j in range(len(N))]
 
             lam = 1 / k
 
@@ -661,14 +690,17 @@ def adjoStep(res, **kwargs):
 
             ind_1= [ind_1[j] + np.inner(G, Beta[j]) for j in range(Beta.shape[0])]
             ind_2= [ind_2[j] - Ps * Pi[j] for j in range(Beta.shape[0])]
-            dir_1= [dir_1[j] + Ns1[j]-Ns[j] for j in range(Beta.shape[0])]
+            dir_1= [dir_1[j] + Ns2[j]-Ns[j] for j in range(Beta.shape[0])]
+            dir_2= [dir_2[j] + Ns1[j]-Ns2[j] for j in range(Beta.shape[0])]
 
-            Ns = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
+            Ns  = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
+            Nss = [Ns[j]  + skk[j]  for j in range(Beta.shape[0])]
+
 
             print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
             sys.stdout.flush()
 
-        adjoRes.ind.append([ind_2, dir_1, ind_1, Ns])
+        adjoRes.ind.append([ind_2, dir_1, ind_1, skk, dir_2, Nss])
 
     elif resp == 'nuclide' and 'xs' in kwargs.keys() :
 
@@ -1031,6 +1063,11 @@ def adjoPlot(res, adjoRes, **kwargs):
         resp = nucData.nuc[respId].name
         sibyl = res.pert['atoms']
         title = resp + ' mass change [g]'
+
+        if resetK == True:
+
+            lab.extend(['k-reset', 'reshuffling'])
+            col.extend(['m', 'hotpink'])
 
 
     if resp == 'keff':

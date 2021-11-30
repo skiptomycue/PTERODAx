@@ -638,8 +638,6 @@ def moveCR(N,t, k):
     MM[p]=N[p]*y
     MM[q]=N[q]*y
 
-    print(MM[p])
-
     def buildSM():
 
         SM = np.diag(np.ones(len(N)))
