@@ -264,8 +264,6 @@ def updatePL(PL, RR):
 
     return PL
 
-
-
 def onixR(PL):
 
     R=onix.salameche.get_xs_mat(PL)
@@ -690,6 +688,21 @@ def plotBU(A, name):
 
         plt.setp(axs, xticks=[0, 21, 43, 65, 87, 109, 131], xticklabels=['0','22','44','22','44','22','44'])
         plt.setp(axs, yticks=[0, 21, 43, 65, 87, 109, 131], yticklabels=['0','22','44','22','44','22','44'])
+
+    fig.savefig(name+'.png')
+
+
+    return
+
+def plotCovx(A, name):
+
+    fig, axs = plt.subplots()
+
+    im = axs.imshow(A, cmap='RdYlGn')
+    fig.colorbar(im, orientation='vertical')
+
+    #plt.setp(axs, xticks=[0, 21, 43, 65, 87, 109, 131], xticklabels=['0','22','44','22','44','22','44'])
+    #plt.setp(axs, yticks=[0, 21, 43, 65, 87, 109, 131], yticklabels=['0','22','44','22','44','22','44'])
 
     fig.savefig(name+'.png')
 

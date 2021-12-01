@@ -13,11 +13,12 @@ from matplotlib.lines import Line2D
 import fun
 import nucData
 import serpent
+import json
 
-PERT     = ['922350', '922380', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
+PERT     = ['922350']#, '922350', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
 RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  'nuclide'                                                # OUTPUT NUCLIDE, KEFF OR NONE
-ND       =  False                                                  # SWITCH ND PERTURBATION
+RESPONSE =  'keff'                                                # OUTPUT NUCLIDE, KEFF OR NONE
+ND       =  True                                                  # SWITCH ND PERTURBATION
 MT       =  '102'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
 resetK   =  0
@@ -47,6 +48,21 @@ plt.rcParams.update({'lines.linewidth': 4})
 plt.rcParams.update({'figure.figsize': (15, 10)})
 plt.rcParams.update({'figure.max_open_warning': 60})
 plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
+
+### TEST ###
+
+def getCovx():
+    if ND != False:
+        mtx = PERT[0][2:5] + '_' + MT
+
+        with open('covx/mtx/' + mtx + '.json') as fp:
+            covx = json.load(fp)
+
+        return covx
+
+covx = np.array(getCovx())
+print(covx)
+fun.plotCovx(covx, 'covx')
 
 ### SOLVERS ###
 
@@ -136,6 +152,7 @@ def directStep(At, sig):
             SM = fun.moveCR(At1, 0, resK)
             At1 = SM.dot(At1)
             N = np.array(At1) * where
+            res.ind.append(SM)
 
         else:
 
@@ -145,7 +162,6 @@ def directStep(At, sig):
 
         At = At1
         res.comp.append(At1.tolist())
-        res.ind.append(SM)
 
         A = fun.Boltz(N, sig, i, 1 / k)
 
@@ -410,8 +426,11 @@ def adjoStep(res, **kwargs):
         ind_2 = np.zeros(ene).tolist()
         dir_1 = np.zeros(ene).tolist()
         ind_3 = np.zeros(ene).tolist()
+        s     = np.zeros(ene).tolist()
 
         RESP = res.keff[-1]
+
+        sens = []
 
         xs_pert = kwargs['xs']
 
@@ -549,6 +568,9 @@ def adjoStep(res, **kwargs):
 
             S = [S[e] + (sk[e] + Bate_sig[e] + Beta_sig[e] + Beta2_sig[e] + Pi_sig[e]) * (sig[xs_pert][e][v][PERTid] / RESP) ** 0 for e in range(ene)]
 
+            s = [s[e] + (sk[e] + Bate_sig[e] + Beta_sig[e] + Beta2_sig[e] + Pi_sig[e]) * (sig[xs_pert][e][v][PERTid] / RESP) ** 1  for e in range(ene)]
+
+            sens.append(s)
 
             ind_1= [ind_1[e] + Beta_sig[e] for e in range(ene)]
             ind_2= [ind_2[e] + Pi_sig[e] for e in range(ene)]
@@ -834,7 +856,7 @@ def adjoStep(res, **kwargs):
     adjoRes.source = adjoRes.source[::-1]
     adjoRes.ind = adjoRes.ind[::-1]
 
-    return adjoRes
+    return adjoRes, sens
 
 ### PLOTS ###
 
@@ -1367,7 +1389,7 @@ def main(**kwargs):
 
             print('\n\nAdjoint calculation\n')
 
-            adjoRes=adjoStep(res, resp=resp, xs=MT)
+            adjoRes, sens = adjoStep(res, resp=resp, xs=MT)
 
             bunSnap(adjoRes.ind[0], res, resp, PERT[0], reac, 'BOL')
             #bunSnap(adjoRes.ind[-2], res, PERT[-2], reac, 'EOL')
@@ -1376,7 +1398,7 @@ def main(**kwargs):
 
             print('\n\nAdjoint calculation\n')
 
-            adjoRes=adjoStep(res, resp=resp)
+            adjoRes, sens = adjoStep(res, resp=resp)
 
             adjoPlot(res, adjoRes, resp=resp)
 
@@ -1390,6 +1412,23 @@ def main(**kwargs):
             fluxPlot(flu.flux, 'Adjoint Flux', '')
             fluxPlot(flu.source, 'Adjoint Source', '')
             fluxPlot(flu.homo, 'Homogeneous adjoint Flux', '')
+
+    print()
+
+    covx = getCovx()
+
+    bun  = sens[-1]
+
+    unc  = fun.tramezzino(bun[::-1], bun, covx)
+
+    print(unc)
+
+
+    bun  = sens[0]
+
+    unc  = fun.tramezzino(bun[::-1], bun, covx)
+
+    print(unc)
 
     printTime(startD, endD, startA, endA)
 
