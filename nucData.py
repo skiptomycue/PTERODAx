@@ -10,10 +10,10 @@ from datetime import datetime
 
 startNuc = datetime.now()
 
-model     = 'UO2'                                    # INPUT MODEL
-energy    =  44                                       # INPUT ENERGY GROUPS
-PASSI     =  2                                      # INPUT STEP NUMBER
-fpSwitch  =  0                                       # SWITCH TO FULL NUCLIDE CHART
+model     = 'HEU'                                    # INPUT MODEL
+energy    =  2                                       # INPUT ENERGY GROUPS
+PASSI     =  50                                      # INPUT STEP NUMBER
+fpSwitch  =  1                                       # SWITCH TO FULL NUCLIDE CHART
 hetSwitch =  0                                       # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
 
 ### INITS ###
@@ -24,7 +24,7 @@ res = ST.read(file + '/'+input+'_res.m')
 dep = ST.read(file + '/'+input+'_dep.m')
 keff = ST.read(file+'/'+input+'_res.m').resdata['absKeff'][:,0]
 time =  dep.days
-giorni = dep.days[-1]/4
+giorni = dep.days[-1]
 T = dep.days[-1]*24*3600
 MXT=ST.MicroXSTuple
 

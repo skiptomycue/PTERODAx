@@ -17,9 +17,9 @@ import json
 
 PERT     = ['922350']#, '922350', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
 RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  'keff'                                                # OUTPUT NUCLIDE, KEFF OR NONE
-ND       =  True                                                  # SWITCH ND PERTURBATION
-MT       =  '102'                                                   # INPUT PERTURBATION XS
+RESPONSE =  None                                                # OUTPUT NUCLIDE, KEFF OR NONE
+ND       =  False                                                  # SWITCH ND PERTURBATION
+MT       =  '18'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
 resetK   =  0
 
@@ -58,11 +58,9 @@ def getCovx():
         with open('covx/mtx/' + mtx + '.json') as fp:
             covx = json.load(fp)
 
-        return covx
+        fun.plotCovx(covx, 'covx')
 
-covx = np.array(getCovx())
-print(covx)
-fun.plotCovx(covx, 'covx')
+        return covx
 
 ### SOLVERS ###
 
@@ -156,7 +154,7 @@ def directStep(At, sig):
 
         else:
 
-            N = np.array(At) * where  # / np.array([nucData.VOL] * len(At)).transpose()
+            N = np.array(At1) * where  # / np.array([nucData.VOL] * len(At)).transpose()
             k = fun.crushK(N, sig, i, 0.3, 3)
             #k=fun.findK(N, i)
 
@@ -858,6 +856,26 @@ def adjoStep(res, **kwargs):
 
     return adjoRes, sens
 
+def UncertBlock(sens):
+
+    print()
+
+    covx = getCovx()
+
+    bun  = sens[-1]
+
+    unc  = fun.tramezzino(bun[::-1], bun, covx)
+
+    print(unc)
+
+
+    bun  = sens[0]
+
+    unc  = fun.tramezzino(bun[::-1], bun, covx)
+
+    print(unc)
+
+
 ### PLOTS ###
 
 def printTime(sd, ed, sa, ea):
@@ -1394,6 +1412,8 @@ def main(**kwargs):
             bunSnap(adjoRes.ind[0], res, resp, PERT[0], reac, 'BOL')
             #bunSnap(adjoRes.ind[-2], res, PERT[-2], reac, 'EOL')
 
+            UncertBlock(sens)
+
         else:
 
             print('\n\nAdjoint calculation\n')
@@ -1412,23 +1432,6 @@ def main(**kwargs):
             fluxPlot(flu.flux, 'Adjoint Flux', '')
             fluxPlot(flu.source, 'Adjoint Source', '')
             fluxPlot(flu.homo, 'Homogeneous adjoint Flux', '')
-
-    print()
-
-    covx = getCovx()
-
-    bun  = sens[-1]
-
-    unc  = fun.tramezzino(bun[::-1], bun, covx)
-
-    print(unc)
-
-
-    bun  = sens[0]
-
-    unc  = fun.tramezzino(bun[::-1], bun, covx)
-
-    print(unc)
 
     printTime(startD, endD, startA, endA)
 
