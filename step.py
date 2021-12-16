@@ -16,7 +16,7 @@ import serpent
 import json
 
 PERT     = ['922350']#, '922350', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
-RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
+RESP_NUC =  '922380'                                               # OUTPUT RESPONSE NUCLIDE
 RESPONSE =  None                                                # OUTPUT NUCLIDE, KEFF OR NONE
 ND       =  False                                                  # SWITCH ND PERTURBATION
 MT       =  '18'                                                   # INPUT PERTURBATION XS
@@ -921,6 +921,11 @@ def massPlot(res):
         regElse=[0, 0, 2]
         matElse=['Ni', 'Ni', 'boro']
 
+    if nucData.model[:3] == 'HEU':
+        isoElse = ['280580', '280600', '50100']
+        regElse=[0, 0, 1]
+        matElse=['Ni', 'Ni', 'boro']
+
     prezz = []
 
     mat = nucData.MAT
@@ -1370,17 +1375,22 @@ def main(**kwargs):
 
     printRes(res, keff=True, comp = False, phi = False, flux = False)
 
+    stampa = 1
 
-    if nucData.fpSwitch == True or resetK == True:
+    if nucData.fpSwitch == True or resetK == True or stampa == 1:
 
         massPlot(res)
         paraPlot(res.keff, 'keff', serp=True, paraserp=[nucData.time, nucData.keff])
-        fluxPlot(res.flux,  'Neutron Flux', 'n/cm'+square+'s', phi=res.phi, serp=nucData.Flux)
 
         psi = fun.reshapePsi(res.flux[0])
         serpsi = fun.reshapePsi(nucData.Flux[0])
         fluxSnap(psi[nucData.fuelId],  'Fuel Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[nucData.fuelId])
         fluxSnap(psi[2],  'Moderator Flux', 'n/cm'+square+'s', phi=res.phi[0], serp=serpsi[2])
+
+        if nucData.energy == 2:
+
+            fluxPlot(res.flux,  'Neutron Flux', 'n/cm'+square+'s', phi=res.phi, serp=nucData.Flux)
+
 
     startD = 0
     endD   = 0

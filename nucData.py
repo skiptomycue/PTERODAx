@@ -11,9 +11,9 @@ from datetime import datetime
 startNuc = datetime.now()
 
 model     = 'HEU'                                    # INPUT MODEL
-energy    =  2                                       # INPUT ENERGY GROUPS
+energy    =  44                                       # INPUT ENERGY GROUPS
 PASSI     =  50                                      # INPUT STEP NUMBER
-fpSwitch  =  1                                       # SWITCH TO FULL NUCLIDE CHART
+fpSwitch  =  0                                       # SWITCH TO FULL NUCLIDE CHART
 hetSwitch =  0                                       # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
 
 ### INITS ###
@@ -286,7 +286,7 @@ class Nuclide:
         if 'boro' in mat and z == '50100':
 
             self.mat = ['boro']
-            self.vol = serpent.volB
+            self.vol = vol[mat.index('boro')]
             self.at  = dep.materials['boro'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
 
             for key in xs[UNI[idReg]][z].keys():
@@ -297,7 +297,7 @@ class Nuclide:
         if 'Fuel' in mat and int(z) > 300000 and z not in ['621481']+[str(a) for a in serpent.sama] and hetSwitch == True :
 
             self.mat = ['Fuel']
-            self.vol = serpent.volMeat
+            self.vol = vol[mat.index('Fuel')]
             self.at  = dep.materials['Fuel'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
 
             for key in xs[UNI[idReg]][z].keys():
@@ -308,7 +308,7 @@ class Nuclide:
         if 'Ni' in mat and z in ['280580', '280600'] and hetSwitch == True:
 
             self.mat = ['Ni']
-            self.vol = serpent.volNi
+            self.vol = vol[mat.index('Ni')]
             self.at  = dep.materials['Ni'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
 
             for key in xs[UNI[idReg]][z].keys():
@@ -371,9 +371,14 @@ def buildAlbe(det):
 
     if model[:3] == 'LEU':
 
-        CB=(np.array(det.detectors['boro'].tallies[::-1]/serpent.volB)/np.array(det.detectors[DET[2]].tallies[::-1]/serpent.volRefl)*1).tolist()
-        CN=(np.array(det.detectors['Ni'].tallies[::-1]/serpent.volNi)/np.array(det.detectors[DET[0]].tallies[::-1]/serpent.volCent)*1).tolist()
-        CF=(np.array(det.detectors['meat'].tallies[::-1]/serpent.volMeat)/np.array(det.detectors[DET[1]].tallies[::-1]/serpent.volFuel)*1).tolist()
+        CB=(np.array(det.detectors['boro'].tallies[::-1]/vol[2][mat[2].index('boro')])/np.array(det.detectors[DET[2]].tallies[::-1]/VOL[2])*1).tolist()
+        CN=(np.array(det.detectors['Ni'].tallies[::-1]/vol[0][mat[0].index('Ni')])/np.array(det.detectors[DET[0]].tallies[::-1]/VOL[0])*1).tolist()
+        CF=(np.array(det.detectors['meat'].tallies[::-1]/vol[1][mat[1].index('Fuel')])/np.array(det.detectors[DET[1]].tallies[::-1]/VOL[1])*1).tolist()
+
+    if model[:3] == 'HEU':
+        CB = (np.array(det.detectors['boro'].tallies[::-1] / vol[1][mat[1].index('boro')]) / np.array(det.detectors[DET[1]].tallies[::-1] / VOL[1]) * 1).tolist()
+        CN = (np.array(det.detectors['Ni'].tallies[::-1] /vol[0][mat[0].index('Ni')]) / np.array(det.detectors[DET[0]].tallies[::-1] / VOL[0]) * 1).tolist()
+        CF = (np.array(det.detectors['meat'].tallies[::-1] / vol[1][mat[1].index('Fuel')]) / np.array(det.detectors[DET[1]].tallies[::-1] / VOL[1]) * 1).tolist()
 
     return SS, F, CB, CN, CF
 

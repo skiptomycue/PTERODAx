@@ -159,7 +159,6 @@ volAl   = 3.94478E+03
 volHwC  = 1.311E+5
 volHwF  = 3.625E+4
 volHwR  = 1.10417E+06
-volAG3  = 3.94032E+03
 
 volCent = volNi + volHwC + volAl
 volFuel = volMeat + volHwF + volClad #+ volAG3
@@ -184,14 +183,13 @@ INP = 'RHF'
 buildDict(model5, VOL, REG, UNI, DET, ZAI, MAT, POW, INP)
 
 
-
 model6 = 'HEU'
 
 volClad = 1.61035E+04
 volMeat = 7.68092E+03
 volB    = 5.74833E+02
 volNi   = 6.51249E+03
-volAl   = 3.94478E+03
+volAl   = 3.92740E+03
 volHwC  = 8.37647E+04
 volHwF  = 3.45781E+04
 volHwR  = 1.10347E+06
@@ -201,7 +199,7 @@ volFuel = volMeat + volHwF + volClad
 volRefl = volHwR
 
 #VOL=[[volCent], [volMeat], [volRefl]]
-VOL=[[volNi , volHwC ], [volMeat , volHwF , volClad,  volB], [volHwR]]
+VOL=[[volNi , volHwC ], [volMeat , volHwF , volClad, volB], [volHwR]]
 REG=[ 'Central', 'Fuel', 'Reflector']
 UNI=['1000','1001','1002']
 DET=['REG1', 'REG2', 'REG3']
@@ -209,7 +207,7 @@ MAT=[['Ni','hwat_ring'], ['Fuel', 'hwat_in', 'Clad', 'boro'], ['hwat_ref']]
 #MAT=[['hwat_ring'], ['Fuel'], ['hwat_ref']]
 
 ZAI1 = ['280580', '280600', '10010', '10020', '80160']
-ZAI2 = ['50100', '531350','541350', '601490', '611490', '621490', '922340', '922350', '922380', '922390', '932390', '942390', '130270', '10010', '10020', '80160']
+ZAI2 = ['50100', '531350','541350', '601490', '611490', '621490', '922340', '922350', '922380', '130270', '10010', '10020', '80160']
 ZAI3 = ['10010', '10020', '80160']
 ZAI  = [ZAI1,ZAI2,ZAI3]
 
