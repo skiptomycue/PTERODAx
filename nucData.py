@@ -10,10 +10,10 @@ from datetime import datetime
 
 startNuc = datetime.now()
 
-model     = 'HEU'                                    # INPUT MODEL
-energy    =  44                                       # INPUT ENERGY GROUPS
+model     = 'LEU/NEW'                                    # INPUT MODEL
+energy    =  2                                       # INPUT ENERGY GROUPS
 PASSI     =  50                                      # INPUT STEP NUMBER
-fpSwitch  =  0                                       # SWITCH TO FULL NUCLIDE CHART
+fpSwitch  =  1                                       # SWITCH TO FULL NUCLIDE CHART
 hetSwitch =  0                                       # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
 
 ### INITS ###
@@ -255,7 +255,7 @@ class Nuclide:
 
         for i in range(len(mat)):
 
-            if z not in ['621481']+[str(a) for a in serpent.sama]:
+            if z not in ['621481', '50100']+[str(a) for a in serpent.sama]:
                 if dep.materials[mat[i]].getValues('days','mdens', zai=int(z))[0][nodo] > 0 :
                     self.mat.append(mat[i])
                     self.at   += dep.materials[mat[i]].getValues('days','mdens', zai=int(z))[0][0] / getMM(z) * vol[i] * 6.022E+23
@@ -272,7 +272,7 @@ class Nuclide:
 
         #self.vol = vol[np.argmax(np.array(d))]
 
-        if z in xs[UNI[idReg]].keys() :
+        if z in xs[UNI[idReg]].keys() and z != '50100':
 
             for key in xs[UNI[idReg]][z].keys():
 
@@ -283,16 +283,53 @@ class Nuclide:
 
             self.xs = xsDef(**kwargs)
 
-        if 'boro' in mat and z == '50100':
+
+
+        if z == '50100':
 
             self.mat = ['boro']
-            self.vol = vol[mat.index('boro')]
-            self.at  = dep.materials['boro'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
 
-            for key in xs[UNI[idReg]][z].keys():
-               xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key])  * 1 * np.array(CB)).tolist()
+            XS = xs.copy()
 
-            self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
+            if idReg == 1:
+
+
+                if model[:3] == 'LEU':
+
+                    for key in xs[UNI[idReg]][z].keys():
+                        xs[UNI[idReg]][z][key] = (np.array(XS[UNI[2]][z][key]) * 1 * np.array(CB)).tolist()
+
+                if model[:3] == 'HEU':
+
+                    for key in xs[UNI[idReg]][z].keys():
+                        xs[UNI[idReg]][z][key] = (np.array(XS[UNI[1]][z][key]) * 1 * np.array(CB)).tolist()
+
+                self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
+
+                self.at = 0
+
+
+            if idReg == 2:
+
+                if model[:3] == 'LEU':
+
+                    self.vol = serpent.volumes[model][2][serpent.materials[model][2].index('boro')]
+
+                    for key in xs[UNI[idReg]][z].keys():
+                       xs[UNI[idReg]][z][key] = (np.array(XS[UNI[2]][z][key])  * 1 * np.array(CB)).tolist()
+
+                if model[:3] == 'HEU':
+
+                    self.vol = serpent.volumes[model][1][serpent.materials[model][1].index('boro')]
+
+                    for key in xs[UNI[2]][z].keys():
+                        xs[UNI[idReg]][z][key] = (np.array(XS[UNI[1]][z][key]) * 1 * np.array(CB)).tolist()
+
+                self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
+
+                self.at = dep.materials['boro'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
+
+
 
         if 'Fuel' in mat and int(z) > 300000 and z not in ['621481']+[str(a) for a in serpent.sama] and hetSwitch == True :
 
@@ -344,7 +381,7 @@ def buildAlbe(det):
 
     R_out=(abs(det.detectors['bordo'].tallies[::-1]))
 
-    if model[:3] == 'LEU':
+    if model[1:3] == 'EU':
 
         R_out=(abs(det.detectors['bordo'].tallies[::-1])+abs(det.detectors['bordoup'].tallies[::-1])+abs(det.detectors['bordodown'].tallies[::-1]))
 
@@ -376,7 +413,7 @@ def buildAlbe(det):
         CF=(np.array(det.detectors['meat'].tallies[::-1]/vol[1][mat[1].index('Fuel')])/np.array(det.detectors[DET[1]].tallies[::-1]/VOL[1])*1).tolist()
 
     if model[:3] == 'HEU':
-        CB = (np.array(det.detectors['boro'].tallies[::-1] / vol[1][mat[1].index('boro')]) / np.array(det.detectors[DET[1]].tallies[::-1] / VOL[1]) * 1).tolist()
+        CB = (np.array(det.detectors['boro'].tallies[::-1] / vol[1][mat[1].index('boro')]) / np.array(det.detectors[DET[1]].tallies[::-1] / VOL[1]) * 0.65).tolist()
         CN = (np.array(det.detectors['Ni'].tallies[::-1] /vol[0][mat[0].index('Ni')]) / np.array(det.detectors[DET[0]].tallies[::-1] / VOL[0]) * 1).tolist()
         CF = (np.array(det.detectors['meat'].tallies[::-1] / vol[1][mat[1].index('Fuel')]) / np.array(det.detectors[DET[1]].tallies[::-1] / VOL[1]) * 1).tolist()
 
@@ -577,7 +614,4 @@ endNuc = datetime.now()
 nuc[ZAI.index('922350')].name = 'Uranium-235'
 nuc[ZAI.index('922380')].name = 'Uranium-238'
 
-if model[:3] == 'LEU':
 
-    nuc[ZAI.index('50100')].name  = 'Boron-10 (reflector)'
-    nuc[ZAI.index('280580')].name = 'Nickel-58 (CR)'

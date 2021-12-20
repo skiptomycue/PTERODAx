@@ -87,7 +87,7 @@ def zeroStep(At, sig):
     AA = fun.Boltz(N, sig, 0, 1 / k, ribalta=True)
 
 
-    #fun.plotBU(np.matrix(AA), 'Regions_mtx')
+    fun.plotBU(np.matrix(AA), 'Regions_mtx')
     #fun.plotBU(np.matrix(A), 'Transport_mtx')
 
 
@@ -121,7 +121,7 @@ def zeroStep(At, sig):
 
     res.M.append(C)
 
-    #fun.plotBU(np.matrix(C), 'Depletion_mtx')
+    fun.plotBU(np.matrix(C), 'Depletion_mtx')
 
     return res, resK
 
@@ -922,9 +922,9 @@ def massPlot(res):
         matElse=['Ni', 'Ni', 'boro']
 
     if nucData.model[:3] == 'HEU':
-        isoElse = ['280580', '280600', '50100']
-        regElse=[0, 0, 1]
-        matElse=['Ni', 'Ni', 'boro']
+        isoElse = ['280580', '280600', '50100', '50100']
+        regElse=[0, 0, 1, 2]
+        matElse=['Ni', 'Ni', 'boro', 'boro']
 
     prezz = []
 
