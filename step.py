@@ -16,9 +16,9 @@ import serpent
 import json
 
 PERT     = ['922350']#, '922350', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
-RESP_NUC =  '922380'                                               # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  None                                                # OUTPUT NUCLIDE, KEFF OR NONE
-ND       =  False                                                  # SWITCH ND PERTURBATION
+RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
+RESPONSE =  'keff'                                                # OUTPUT NUCLIDE, KEFF OR NONE
+ND       =  True                                                  # SWITCH ND PERTURBATION
 MT       =  '18'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
 resetK   =  0
@@ -49,18 +49,6 @@ plt.rcParams.update({'figure.figsize': (15, 10)})
 plt.rcParams.update({'figure.max_open_warning': 60})
 plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
 
-### TEST ###
-
-def getCovx():
-    if ND != False:
-        mtx = PERT[0][2:5] + '_' + MT
-
-        with open('covx/mtx/' + mtx + '.json') as fp:
-            covx = json.load(fp)
-
-        fun.plotCovx(covx, 'covx')
-
-        return covx
 
 ### SOLVERS ###
 
@@ -856,25 +844,6 @@ def adjoStep(res, **kwargs):
 
     return adjoRes, sens
 
-def UncertBlock(sens):
-
-    print()
-
-    covx = getCovx()
-
-    bun  = sens[-1]
-
-    unc  = fun.tramezzino(bun[::-1], bun, covx)
-
-    print(unc)
-
-
-    bun  = sens[0]
-
-    unc  = fun.tramezzino(bun[::-1], bun, covx)
-
-    print(unc)
-
 
 ### PLOTS ###
 
@@ -1360,9 +1329,6 @@ def bunSnap(resu, res, resp, name, xs, BOL):
     axs.legend(loc='best')
     axs.set_xlim(1E-9, 1E+2)
 
-    print(sum(y))
-    print(sum(y2))
-
     fig.savefig(model+'/'+resp+'_sensitivity_to_'+name+'_snap_'+BOL+'_'+xs+'.png')
 
 ### MAIN ###
@@ -1421,8 +1387,6 @@ def main(**kwargs):
 
             bunSnap(adjoRes.ind[0], res, resp, PERT[0], reac, 'BOL')
             #bunSnap(adjoRes.ind[-2], res, PERT[-2], reac, 'EOL')
-
-            UncertBlock(sens)
 
         else:
 

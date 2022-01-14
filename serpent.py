@@ -9,6 +9,21 @@ zais     ={}
 power    ={}
 inp      ={}
 
+def sensDict(RESP, PERT, MT):
+
+    res_sens={}
+
+    for a in RESP:
+        res_sens[a]= {}
+
+        for b in PERT:
+            res_sens[a][b] = {}
+
+            for c in MT:
+                res_sens[a][b][c] = {}
+
+    with open('covx/SENS.json', 'w') as fp:
+        json.dump(res_sens, fp)
 def buildDict(model, VOL,REG,UNI,DET,ZAI, MAT, POW, INP):
 
     volumes[model]   = VOL
@@ -145,6 +160,7 @@ POW = 58.3E+6
 INP = 'INP'
 
 buildDict(model4, VOL, REG, UNI, DET, ZAI, MAT, POW, INP)
+
 
 
 model5 = 'LEU/OLD'
