@@ -132,9 +132,9 @@ def boltzL(N, sigma, t, **kwargs):
 
     A = buildPozz(N, sigma, t, **kwargs)
 
-    if N.ravel()[-1] == 0:
-        S=S*0
-        T=T*0
+    #if N.ravel()[-1] == 0:
+    #    S=S*0
+    #    T=T*0
 
     return (A+S+T)
 
