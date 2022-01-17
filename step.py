@@ -15,11 +15,11 @@ import nucData
 import serpent
 import json
 
-PERT     = ['922350']#, '922350', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
+PERT     = ['922380']#, '922350', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
 RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
 RESPONSE =  'keff'                                                # OUTPUT NUCLIDE, KEFF OR NONE
 ND       =  True                                                  # SWITCH ND PERTURBATION
-MT       =  '18'                                                   # INPUT PERTURBATION XS
+MT       =  '102'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
 resetK   =  0
 
@@ -48,7 +48,6 @@ plt.rcParams.update({'lines.linewidth': 4})
 plt.rcParams.update({'figure.figsize': (15, 10)})
 plt.rcParams.update({'figure.max_open_warning': 60})
 plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
-
 
 ### SOLVERS ###
 
@@ -716,6 +715,8 @@ def adjoStep(res, **kwargs):
         ind_2 = np.zeros(ene).tolist()
         dir_1 = np.zeros(ene).tolist()
 
+        sens = []
+
         RESP = res.comp[-1][respId]
 
         xs_pert = kwargs['xs']
@@ -843,6 +844,23 @@ def adjoStep(res, **kwargs):
     adjoRes.ind = adjoRes.ind[::-1]
 
     return adjoRes, sens
+
+def UncertBlock(sens):
+
+    response = RESPONSE
+    perturb  = PERT[0]
+
+    if RESPONSE == 'nuclide':
+
+        response = RESP_NUC
+
+    with open('COVX/SENS.json') as fp:
+        res_sens = json.load(fp)
+
+    res_sens[response][perturb][MT] = sens
+
+    with open('COVX/SENS.json', 'w') as fp:
+        json.dump(res_sens, fp)
 
 ### PLOTS ###
 
@@ -1386,6 +1404,10 @@ def main(**kwargs):
 
             bunSnap(adjoRes.ind[0], res, resp, PERT[0], reac, 'BOL')
             #bunSnap(adjoRes.ind[-2], res, PERT[-2], reac, 'EOL')
+
+            UncertBlock(sens)
+
+
 
         else:
 

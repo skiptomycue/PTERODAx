@@ -22,7 +22,7 @@ def sensDict(RESP, PERT, MT):
             for c in MT:
                 res_sens[a][b][c] = {}
 
-    with open('covx/SENS.json', 'w') as fp:
+    with open('COVX/SENS.json', 'w') as fp:
         json.dump(res_sens, fp)
 def buildDict(model, VOL,REG,UNI,DET,ZAI, MAT, POW, INP):
 

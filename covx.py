@@ -9,9 +9,9 @@ PERT = [('922350', '18'), ('922350', '102'), ('922380', '102')]
 zailist  = ['922350', '922380', '942390', '80160', '10010']
 pertlist = ['tot', 'ela', 'sab', 'inl', '102', '18', 'nxn']
 
-sens = ST.read('covx/GPT/INP_sens0.m')
+sens = ST.read('COVX/GPT/INP_sens0.m')
 SSK = sens.sensitivities['keff']
-with open('covx/SENS.json') as fp:
+with open('COVX/SENS.json') as fp:
     res_sens = json.load(fp)
 printKeys = False
 
@@ -22,7 +22,7 @@ def getCovx(PERT):
 
     mtx = PERT[0][2:5] + '_' + PERT[1]
 
-    with open('covx/mtx/' + mtx + '.json') as fp:
+    with open('COVX/mtx/' + mtx + '.json') as fp:
         covx = json.load(fp)
 
     return covx
@@ -34,7 +34,7 @@ def plotCovx(A, name):
     fig.colorbar(im, orientation='vertical')
     axs.set(xlabel='Energy groups', title='Covariance matrix for '+name[0]+' MT='+name[1])
 
-    fig.savefig('covx/'+name[0]+' MT='+name[1]+'.png')
+    fig.savefig('COVX/'+name[0]+' MT='+name[1]+'.png')
 def fluxSnap(flux, name, UM, **kwargs):
 
     x = sens.energies[::-1]
@@ -43,7 +43,7 @@ def fluxSnap(flux, name, UM, **kwargs):
 
     therm=  [0] + [flux[j] for j in range(len(flux))]
 
-    axs.step(x, therm, 'b', where='pre', label='PTERODAx')
+    axs.step(x, therm, 'b', where='pre', label='PTERODAx DPT')
     #axs.set_xlim(0, ene)
     axs.set(xlabel='Energy [MeV]', ylabel='sensitivity' + ' [' + UM +']', title='keff sensitivity to '+name[0]+' MT='+name[1])
 
@@ -53,14 +53,14 @@ def fluxSnap(flux, name, UM, **kwargs):
 
         therm =  [0] + [flux[j] for j in range(len(flux))]
 
-        axs.step(x, therm, 'r', where='pre', label='SERPENT')
+        axs.step(x, therm, 'r', where='pre', label='SERPENT GPT')
 
     #axs.set_yscale('log')
     axs.set_xscale('log')
     axs.legend(loc='upper right')
     axs.set_xlim(1E-9, 1E+2)
 
-    fig.savefig('covx/sens_comparison_'+name[0]+' MT='+name[1]+'.png')
+    fig.savefig('COVX/sens_comparison_'+name[0]+' MT='+name[1]+'.png')
 def getName(zai):
 
     z=zai[:-4]
@@ -94,7 +94,7 @@ def main(res_sens, PERT):
 
         plotCovx(covx, PERT[i])
 
-        bun = res_sens['keff'][zai][MT]
+        bun = res_sens['keff'][zai][MT][0]
 
         unc = tramezzino(bun[::-1], bun, covx) ** 0.5
 
@@ -114,5 +114,7 @@ def main(res_sens, PERT):
         print(sens.perts)
         print(SSK[0,0,5,:,0])
 
-
 main(res_sens, PERT)
+
+
+
