@@ -1,6 +1,7 @@
 import json
 import serpentTools as ST
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 import numpy as np
 from periodictable import elements
 
@@ -9,7 +10,7 @@ PERT = [('922350', '18'), ('922350', '102'), ('922380', '102')]
 zailist  = ['922350', '922380', '942390', '80160', '10010']
 pertlist = ['tot', 'ela', 'sab', 'inl', '102', '18', 'nxn']
 
-sens = ST.read('COVX/GPT/INP_sens0.m')
+sens = ST.read('UO2/GPT/INP_sens0.m')
 SSK = sens.sensitivities['keff']
 with open('COVX/SENS.json') as fp:
     res_sens = json.load(fp)
@@ -20,21 +21,15 @@ def tramezzino(Ns,N,R):
     return float(np.inner(np.array(Ns), np.array(R).dot(np.array(N))))
 def getCovx(PERT):
 
-    mtx = PERT[0][2:5] + '_' + PERT[1]
+    z  = PERT[0][:-1]
+    MT = PERT[1]
 
-    with open('COVX/mtx/' + mtx + '.json') as fp:
-        covx = json.load(fp)
+    with open('COVX/mtx.json') as fp:
+        cvx = json.load(fp)
 
-    return covx
-def plotCovx(A, name):
+    mtx = cvx[z][MT]
 
-    fig, axs = plt.subplots()
-
-    im = axs.imshow(A, cmap='Reds')
-    fig.colorbar(im, orientation='vertical')
-    axs.set(xlabel='Energy groups', title='Covariance matrix for '+name[0]+' MT='+name[1])
-
-    fig.savefig('COVX/'+name[0]+' MT='+name[1]+'.png')
+    return mtx
 def fluxSnap(flux, name, UM, **kwargs):
 
     x = sens.energies[::-1]
@@ -85,6 +80,8 @@ def main(res_sens, PERT):
 
     print('\nUAM-benchmark keff uncertainties to ND:\n')
 
+    tot = 0
+
     for i in range(len(PERT)):
 
         zai = PERT[i][0]
@@ -92,11 +89,11 @@ def main(res_sens, PERT):
 
         covx = getCovx(PERT[i])
 
-        plotCovx(covx, PERT[i])
-
         bun = res_sens['keff'][zai][MT][0]
 
         unc = tramezzino(bun[::-1], bun, covx) ** 0.5
+
+        tot += unc**2
 
         print(getName(zai)+' MT='+MT+':\t'+str(int(unc*1E+5))+' pcm')
 
@@ -105,6 +102,8 @@ def main(res_sens, PERT):
 
         ssk = SSK[0, idZai, idPert, :, 0]
         fluxSnap(bun, PERT[i], '%/%', serp=ssk)
+
+    print('\ntotal uncertainty: \t'+str(int(tot**0.5*1E+5))+' pcm\n')
 
     if printKeys == True:
 

@@ -15,11 +15,11 @@ import nucData
 import serpent
 import json
 
-PERT     = ['922380']#, '922350', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
+PERT     = ['922350']#, '922350', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
 RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
 RESPONSE =  'keff'                                                # OUTPUT NUCLIDE, KEFF OR NONE
 ND       =  True                                                  # SWITCH ND PERTURBATION
-MT       =  '102'                                                   # INPUT PERTURBATION XS
+MT       =  '18'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
 resetK   =  0
 
