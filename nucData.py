@@ -11,9 +11,9 @@ from datetime import datetime
 startNuc = datetime.now()
 
 
-model     = 'UO2'                                    # INPUT MODEL
+model     = 'UO2/NEW'                                    # INPUT MODEL
 energy    =  44                                      # INPUT ENERGY GROUPS
-PASSI     =  10                                      # INPUT STEP NUMBER
+PASSI     =  100                                      # INPUT STEP NUMBER
 fpSwitch  =  0                                       # SWITCH TO FULL NUCLIDE CHART
 hetSwitch =  0                                       # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
 
@@ -330,6 +330,11 @@ class Nuclide:
 
                 self.at = dep.materials['boro'].getValues('days', 'mdens', zai=int(z))[0][0] / getMM(z) * self.vol * 6.022E+23
 
+            else:
+
+                for key in xs[UNI[idReg]][z].keys():
+                    xs[UNI[idReg]][z][key] = (np.array(xs[UNI[idReg]][z][key]) / self.vol * VOL[idReg]).tolist()
+                self.xs = {**xs[UNI[idReg]][z], **xsDef(**kwargs)}
 
 
         if 'Fuel' in mat and int(z) > 300000 and z not in ['621481']+[str(a) for a in serpent.sama] and hetSwitch == True :

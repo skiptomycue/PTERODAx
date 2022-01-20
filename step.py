@@ -15,14 +15,15 @@ import nucData
 import serpent
 import json
 
-PERT     = ['922350']#, '922350', '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
-RESP_NUC =  '942390'                                               # OUTPUT RESPONSE NUCLIDE
+PERT     = ['922350', '922380']#, '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
+RESP_NUC =  '922380'                                               # OUTPUT RESPONSE NUCLIDE
 RESPONSE =  'keff'                                                # OUTPUT NUCLIDE, KEFF OR NONE
-ND       =  True                                                  # SWITCH ND PERTURBATION
+ND       =  False                                                # SWITCH ND PERTURBATION
 MT       =  '18'                                                   # INPUT PERTURBATION XS
 pert     =  1.01                                                   # INPUT PERTURBATION %
 resetK   =  0
 
+sens_formula = False
 ### INITS ###
 
 respId = nucData.ZAI.index(RESP_NUC)
@@ -268,572 +269,845 @@ def adjoStep(res, **kwargs):
     dir_2=np.zeros(len(res.comp[0])).tolist()
 
     S = np.zeros(ene).tolist()
+    sens = []
 
     resp = kwargs['resp']
 
-    if resp == 'keff' and 'xs' not in kwargs.keys() :
+    if   resetK == False:
 
-        ind_3 = np.zeros(len(res.comp[0])).tolist()
-        SS=Ns.copy()
+        if   resp == 'keff'    and 'xs' not in kwargs.keys() and sens_formula == False :
 
-        for i in range(n-1):
+            ind_3 = np.zeros(len(res.comp[0])).tolist()
+            SS=Ns.copy()
 
-            v = -2 - i
+            for i in range(n-1):
 
-            Psi = res.flux[v]
+                v = -2 - i
 
-            Phi = float(res.phi[v])
+                Psi = res.flux[v]
 
-            C = res.M[v+1]
+                Phi = float(res.phi[v])
 
-            k = res.keff[v]
+                C = res.M[v+1]
 
-            N = res.comp[v+1]
-            No = res.comp[v]
+                k = res.keff[v]
 
-            psi = fun.reshapePsi(Psi)
+                N = res.comp[v+1]
+                No = res.comp[v]
 
-            rr = fun.rr(fun.sig, psi, Phi, v)
+                psi = fun.reshapePsi(Psi)
 
-            # homogeneous adjoint
+                rr = fun.rr(fun.sig, psi, Phi, v)
 
-            A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
+                # homogeneous adjoint
 
-            A[-1] = Psi
+                A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
 
-            B = np.zeros(len(A[0])).tolist()
+                A[1] = Psi
 
-            B[-1] = 1
+                B = np.zeros(len(A[0])).tolist()
 
-            Gh = np.linalg.inv(A).dot(B)
+                B[1] = 1
 
-            adjoRes.homo.append(Gh)
+                Gh = np.linalg.inv(A).dot(B)
 
-            # keff sens
+                adjoRes.homo.append(Gh)
 
-            ssk = [(fun.kSens(Gh, Psi, No, k, j, v)) for j in range(len(No))]
-            #ssk[nucData.ZAI.index('922350')]=-ssk[nucData.ZAI.index('922350')]
+                # keff sens
 
-            dR = Psi.copy() * 0
-            dR2 = Psi.copy() * 0
-            ai = 0
+                #ssk[nucData.ZAI.index('922350')]=-ssk[nucData.ZAI.index('922350')]
 
-            if  i == 0:
-                Ns  = np.array(ssk)
-                Nss = Ns.copy()
+                dR = Psi.copy() * 0
+                dR2 = Psi.copy() * 0
+                ai = 0
 
-                dR = fun.dR(Psi, Gh, N, k, v)
-                ai = (Psi).dot(dR)
+                if  i == 0:
+                    ssk = [(fun.kSens(Gh, Psi, No, k, j, v)) for j in range(len(No))]
+                    Ns  = np.array(ssk)
 
-                dR2 = fun.dR2(Psi, Gh, N, k, v)
-                dR2[1] = 0
+                    dR = fun.dR(Psi, Gh, N, k, v)
+                    ai = (Psi).dot(dR)
 
-                SS = Ns.copy()
-                sk = [sk[j] + ssk[j] for j in range(len(N))]
+                    dR2 = fun.dR2(Psi, Gh, N, k, v)
+                    dR2[1] = 0
 
-            adjoRes.comp.append(Nss)
+                    sk = [sk[j] + ssk[j] for j in range(len(N))]
 
-            adjoRes.ind.append([ind_2, dir_1, ind_1, ind_3, sk, Nss])
+                adjoRes.comp.append(Ns)
 
-            dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
+                adjoRes.ind.append([ind_2, dir_1, ind_1, ind_3, ssk, Ns])
 
-            SS = Ns1.copy()
+                dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
 
-            old_stdout = sys.stdout  # backup current stdout
-            sys.stdout = open(os.devnull, "w")
-            Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose() * (dt), np.array(Ns))
-            sys.stdout = old_stdout  # reset old stdout
+                SS = Ns1.copy()
 
-            # adjoint power normalization
+                old_stdout = sys.stdout  # backup current stdout
+                sys.stdout = open(os.devnull, "w")
+                Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose() * (dt), np.array(Ns))
+                sys.stdout = old_stdout  # reset old stdout
 
-            PL = fun.updatePL(fun.pl, rr )
-            R = fun.onixR(PL)
-            Ps = (fun.I([Ns1, SS], [No, N],  R, dt) + ai) / P
+                # adjoint power normalization
 
-            adjoRes.pow.append(Ps)
+                PL = fun.updatePL(fun.pl, rr )
+                R  = fun.Bateman(rr)# - fun.onixD(PL)
+                #R  = fun.onixR(PL)
+                Ps = (fun.I([Ns1, SS], [No, N],  R, dt) + ai) / P
 
-            # adjoint source
+                adjoRes.pow.append(Ps)
 
-            B = -dR -np.array(fun.Qs([No, N], [Ns1, SS], Ps, Phi, v, dt))
+                # adjoint source
 
-            adjoRes.source.append(np.array(B))
+                B = -dR -np.array(fun.Qs([No, N], [Ns1, SS], Ps, Phi, v, dt))
 
-            # adjoflux-shape algebra
+                adjoRes.source.append(np.array(B))
 
-            A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
+                # adjoflux-shape algebra
 
-            #A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
-            A[-1] = Gh
+                A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
 
-            B[-1] = 0
+                #A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
+                A[1] = Gh
 
-            Gp = np.linalg.inv(A).dot(np.array(B))
+                B[1] = 0
 
-            b = (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gp)) / (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gh))
+                Gp = np.linalg.inv(A).dot(np.array(B))
 
-            G = Gp - b * Gh
+                b = (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gp)) / (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gh))
 
-            adjoRes.flux.append(G)
+                G = Gp - b * Gh
 
-            A = fun.Boltz(No * where, sig, v, 1 / k)
-            A[-1] = Psi
-            G2 = np.linalg.inv(A).dot(np.array(-dR2))
+                adjoRes.flux.append(G)
 
-            # step condition
+                A = fun.Boltz(No * where, sig, v, 1 / k)
+                A[1] = Psi
+                G2 = np.linalg.inv(A).dot(np.array(-dR2))
 
-            lam = 1 / k
+                # step condition
 
-            Beta  = fun.beta(Psi, lam, No, v)
-            Beta2 = fun.beta(Gh, lam, No, v)
+                lam = 1 / k
 
-            Pi = rr['fission'].copy()*sig['v']
+                Beta  = fun.beta(Psi, lam, No, v)
+                Beta2 = fun.beta2(Gh, lam, No, v)
 
-            ind_1 = [ind_1[j] + np.inner(G, Beta[j]) for j in range(Beta.shape[0])]
-            ind_2 = [ind_2[j] - Ps * Pi[j] for j in range(Beta.shape[0])]
-            ind_3 = [ind_3[j] + np.inner(G2, Beta2[j]) for j in range(Beta.shape[0])]
-            dir_1 = [dir_1[j] + Ns1[j] - Ns[j] for j in range(Beta.shape[0])]
+                Pi = rr['fission'].copy()*sig['v']
 
-            # Ns = [Ns1[j] - (np.inner(G, Beta[j]) + (Ps * Pi[j])) + (fun.kSens(Gh, Psi,  N, k , j, v)) for j in range(Beta.shape[0])]
+                ind_1 = [ind_1[j] + np.inner(G, Beta[j]) for j in range(Beta.shape[0])]
+                ind_2 = [ind_2[j] - Ps * Pi[j] for j in range(Beta.shape[0])]
+                ind_3 = [ind_3[j] + np.inner(G2, Beta2[j]) for j in range(Beta.shape[0])]
+                dir_1 = [dir_1[j] + Ns1[j] - Ns[j] for j in range(Beta.shape[0])]
 
-            Ns = [Ns1[j] + (np.inner(G, Beta[j]) - Ps * Pi[j]  + np.inner(G2, Beta2[j])) for j in range(Beta.shape[0])]
-            Nss = [Ns[j] for j in range(Beta.shape[0])]
+                # Ns = [Ns1[j] - (np.inner(G, Beta[j]) + (Ps * Pi[j])) + (fun.kSens(Gh, Psi,  N, k , j, v)) for j in range(Beta.shape[0])]
 
-            # adjoRes.ind.append([ind_2,dir_1,ind_1, sk, Nss])
+                Ns = [Ns1[j] + (np.inner(G, Beta[j]) - Ps * Pi[j]  + np.inner(G2, Beta2[j])) for j in range(Beta.shape[0])]
 
-            print('\t' + str(math.ceil(i / n * 100)) + "% complete", end='\r')
-            sys.stdout.flush()
+                # adjoRes.ind.append([ind_2,dir_1,ind_1, sk, Nss])
 
-        adjoRes.ind.append([ind_2, dir_1, ind_1, ind_3, sk, Ns])
+                print('\t' + str(math.ceil(i / n * 100)) + "% complete", end='\r')
+                sys.stdout.flush()
 
-    elif resp == 'keff' and 'xs' in kwargs.keys() :
+            adjoRes.ind.append([ind_2, dir_1, ind_1, ind_3, ssk, Ns])
 
-        ind_1 = np.zeros(ene).tolist()
-        ind_2 = np.zeros(ene).tolist()
-        dir_1 = np.zeros(ene).tolist()
-        ind_3 = np.zeros(ene).tolist()
-        s     = np.zeros(ene).tolist()
+        elif resp == 'keff' and 'xs' in kwargs.keys() :
 
-        RESP = res.keff[-1]
+            ind_1 = np.zeros(ene).tolist()
+            ind_2 = np.zeros(ene).tolist()
+            dir_1 = np.zeros(ene).tolist()
+            ind_3 = np.zeros(ene).tolist()
+            s     = np.zeros(ene).tolist()
 
-        sens = []
+            RESP = res.keff[-1]
 
-        xs_pert = kwargs['xs']
+            sens = []
 
-        for i in range(n-1):
+            xs_pert = kwargs['xs']
 
-            v = -2 - i
+            for i in range(n-1):
 
-            Psi = res.flux[v]
+                v = -2 - i
 
-            Phi = float(res.phi[v])
+                Psi = res.flux[v]
 
-            C = res.M[v+1]
+                Phi = float(res.phi[v])
 
-            k = res.keff[v]
+                C = res.M[v+1]
 
-            N = res.comp[v+1]
-            No = res.comp[v]
+                k = res.keff[v]
 
-            psi = fun.reshapePsi(Psi)
+                N = res.comp[v+1]
+                No = res.comp[v]
 
-            rr = fun.rr(fun.sig, psi, Phi, v)
+                psi = fun.reshapePsi(Psi)
 
-            # homogeneous adjoint
+                rr = fun.rr(fun.sig, psi, Phi, v)
 
-            A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
+                # homogeneous adjoint
 
-            A[1] = Psi
+                A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
 
-            B = np.zeros(len(A[0])).tolist()
+                A[1] = Psi
 
-            B[1] = 1
+                B = np.zeros(len(A[0])).tolist()
 
-            Gh = np.linalg.inv(A).dot(B)
+                B[1] = 1
 
-            adjoRes.homo.append(Gh)
+                Gh = np.linalg.inv(A).dot(B)
 
-            # keff sens
+                adjoRes.homo.append(Gh)
 
-            #ssk[nucData.ZAI.index('922350')]=-ssk[nucData.ZAI.index('922350')]
+                # keff sens
 
-            dR = Psi.copy() * 0
-            dR2 = Psi.copy() * 0
-            ai = 0
-            sk = np.zeros(ene).tolist()
+                #ssk[nucData.ZAI.index('922350')]=-ssk[nucData.ZAI.index('922350')]
 
-            if  i == 0:
+                dR = Psi.copy() * 0
+                dR2 = Psi.copy() * 0
+                ai = 0
+                sk = np.zeros(ene).tolist()
 
-                ssk = [(fun.kSens(Gh, Psi, No, k, j, v)) for j in range(len(No))]
-                Ns  = np.array(ssk)
-                Nss = Ns.copy()
+                if  i == 0:
 
-                dR = fun.dR(Psi, Gh, N, k, v)
-                ai = (Psi).dot(dR)
+                    ssk = [(fun.kSens(Gh, Psi, No, k, j, v)) for j in range(len(No))]
+                    Ns  = np.array(ssk)
 
-                dR2 = fun.dR2(Psi, Gh, N, k, v)
-                dR2[1] = 0
+                    dR = fun.dR(Psi, Gh, N, k, v)
+                    ai = (Psi).dot(dR)
 
-                sk = fun.kSensSig(Gh, Psi, No, k, PERTid, xs_pert, v)
-                skk = sk
+                    dR2 = fun.dR2(Psi, Gh, N, k, v)
+                    dR2[1] = 0
 
-                SS = Ns.copy()
+                    sk = fun.kSensSig(Gh, Psi, No, k, PERTid, xs_pert, v)
+                    skk = sk
 
-            adjoRes.comp.append(Nss)
+                adjoRes.comp.append(Ns)
+
+                adjoRes.ind.append([dir_1, ind_1, ind_2, ind_3, skk, S])
+
+                dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
+
+                SS = Ns1.copy()
+
+                old_stdout = sys.stdout  # backup current stdout
+                sys.stdout = open(os.devnull, "w")
+                Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose() * (dt), np.array(Ns))
+                sys.stdout = old_stdout  # reset old stdout
+
+
+                # adjoint power normalization
+
+                PL = fun.updatePL(fun.pl, rr )
+                R = fun.onixR(PL)
+                Ps = (fun.I([Ns1, SS], [No, N],  R, dt) + ai) / P
+
+                adjoRes.pow.append(Ps)
+
+                # adjoint source
+
+                B = -dR -np.array(fun.Qs([No, N], [Ns1, SS], Ps, Phi, v, dt))
+
+                adjoRes.source.append(np.array(B))
+
+                # adjoflux-shape algebra
+
+                A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
+
+
+                #A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
+                A[1] = Gh
+
+                B[1] = 0
+
+                Gp = np.linalg.inv(A).dot(np.array(B))
+
+                b = (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gp)) / (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gh))
+
+                G = Gp - b * Gh
+
+                adjoRes.flux.append(G)
+
+                A = fun.Boltz(No * where, sig, v, 1 / k)
+                B = np.zeros(len(A[0])) -dR2
+                A[1] = Psi
+                B[1] = 0
+                G2 = np.linalg.inv(A).dot(np.array(B))
+
+                # step condition
+
+                lam = 1 / k
+
+                Beta  = fun.beta(Psi, lam, No, v)
+                Beta2 = fun.beta2(Gh, lam, No, v)
+
+                Pi = rr['fission'].copy()*sig['v']
+
+                Ns = [Ns1[j] + (np.inner(G, Beta[j]) - Ps * Pi[j]  + np.inner(G2, Beta2[j])) for j in range(Beta.shape[0])]
+
+                # SENSITIVITY
+
+                Beta_sig  =  fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)
+                Bate_sig  =  fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
+                Beta2_sig =  fun.beta2Sig(Gh, lam, xs_pert, No, G2, PERTid, v)
+                Pi_sig    = -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Ps
+                #skk       =  fun.kSensSig(Gh, Psi, No, k, PERTid, xs_pert, v)
+
+
+                S = [S[e] + (sk[e] + Bate_sig[e] + Beta_sig[e] + Beta2_sig[e] + Pi_sig[e]) * (sig[xs_pert][e][v][PERTid] / RESP) ** 0 for e in range(ene)]
+
+                s = [s[e] + (sk[e] + Bate_sig[e] + Beta_sig[e] + Beta2_sig[e] + Pi_sig[e]) * (sig[xs_pert][e][v][PERTid] / RESP) ** 1  for e in range(ene)]
+
+                sens.append(s)
+
+                ind_1= [ind_1[e] + Beta_sig[e] for e in range(ene)]
+                ind_2= [ind_2[e] + Pi_sig[e] for e in range(ene)]
+                ind_3= [ind_3[e] + Beta2_sig[e] for e in range(ene)]
+                dir_1= [dir_1[e] + Bate_sig[e] for e in range(ene)]
+                #ind_1= [ind_1[e] + Beta_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                #ind_2= [ind_2[e] + Pi_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                #ind_3= [ind_3[e] + Beta2_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                #dir_1= [dir_1[e] + Bate_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+
+                # Ns = [Ns1[j] - (np.inner(G, Beta[j]) + (Ps * Pi[j])) + (fun.kSens(Gh, Psi,  N, k , j, v)) for j in range(Beta.shape[0])]
+                # adjoRes.ind.append([ind_2,dir_1,ind_1, sk, Nss])
+
+                print('\t' + str(math.ceil(i / n * 100)) + "% complete", end='\r')
+                sys.stdout.flush()
 
             adjoRes.ind.append([dir_1, ind_1, ind_2, ind_3, skk, S])
 
-            dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
+        elif resp == 'keff' and 'xs' not in kwargs.keys() and sens_formula == True  :
 
-            SS = Ns1.copy()
+            RESP = res.keff[-1]
 
-            old_stdout = sys.stdout  # backup current stdout
-            sys.stdout = open(os.devnull, "w")
-            Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose() * (dt), np.array(Ns))
-            sys.stdout = old_stdout  # reset old stdout
+            sens = []
 
+            ind_3 = np.zeros(len(res.comp[0])).tolist()
+            S     = np.zeros(len(res.comp[0])).tolist()
+            s     = np.zeros(len(res.comp[0])).tolist()
 
-            # adjoint power normalization
+            for i in range(n-1):
 
-            PL = fun.updatePL(fun.pl, rr )
-            R = fun.onixR(PL)
-            Ps = (fun.I([Ns1, SS], [No, N],  R, dt) + ai) / P
+                v = -2 - i
 
-            adjoRes.pow.append(Ps)
+                Psi = res.flux[v]
 
-            # adjoint source
+                Phi = float(res.phi[v])
 
-            B = -dR -np.array(fun.Qs([No, N], [Ns1, SS], Ps, Phi, v, dt))
+                C = res.M[v+1]
 
-            adjoRes.source.append(np.array(B))
+                k = res.keff[v]
 
-            # adjoflux-shape algebra
+                N = res.comp[v+1]
+                No = res.comp[v]
 
-            A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
+                psi = fun.reshapePsi(Psi)
 
+                rr = fun.rr(fun.sig, psi, Phi, v)
 
-            #A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
-            A[1] = Gh
+                # homogeneous adjoint
 
-            B[1] = 0
+                A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
 
-            Gp = np.linalg.inv(A).dot(np.array(B))
+                A[1] = Psi
 
-            b = (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gp)) / (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gh))
+                B = np.zeros(len(A[0])).tolist()
 
-            G = Gp - b * Gh
+                B[1] = 1
 
-            adjoRes.flux.append(G)
+                Gh = np.linalg.inv(A).dot(B)
 
-            A = fun.Boltz(No * where, sig, v, 1 / k)
-            B = np.zeros(len(A[0])) -dR2
-            A[1] = Psi
-            B[1] = 0
-            G2 = np.linalg.inv(A).dot(np.array(B))
+                adjoRes.homo.append(Gh)
 
-            # step condition
+                # keff sens
 
-            lam = 1 / k
+                #ssk[nucData.ZAI.index('922350')]=-ssk[nucData.ZAI.index('922350')]
 
-            Beta  = fun.beta(Psi, lam, No, v)
-            Beta2 = fun.beta(Gh, lam, No, v)
+                dR = Psi.copy() * 0
+                dR2 = Psi.copy() * 0
+                ai = 0
+                ssk = np.zeros(len(N)).tolist()
 
-            Pi = rr['fission'].copy()*sig['v']
+                if  i == 0:
 
-            Ns = [Ns1[j] + (np.inner(G, Beta[j]) - Ps * Pi[j]  + np.inner(G2, Beta2[j])) for j in range(Beta.shape[0])]
-            Nss = [Ns[j] for j in range(Beta.shape[0])]
+                    ssk = [(fun.kSens(Gh, Psi, No, k, j, v)) for j in range(len(No))]
+                    Ns  = np.array(ssk)
 
-            # SENSITIVITY
+                    dR = fun.dR(Psi, Gh, N, k, v)
+                    ai = (Psi).dot(dR)
 
-            Beta_sig  =  fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)
-            Bate_sig  =  fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
-            Beta2_sig =  fun.beta2Sig(Gh, lam, xs_pert, No, G2, PERTid, v)
-            Pi_sig    = -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Ps
-            #skk       =  fun.kSensSig(Gh, Psi, No, k, PERTid, xs_pert, v)
+                    dR2 = fun.dR2(Psi, Gh, N, k, v)
+                    dR2[1] = 0
 
+                    skk = ssk.copy()
 
-            S = [S[e] + (sk[e] + Bate_sig[e] + Beta_sig[e] + Beta2_sig[e] + Pi_sig[e]) * (sig[xs_pert][e][v][PERTid] / RESP) ** 0 for e in range(ene)]
+                adjoRes.comp.append(Ns)
 
-            s = [s[e] + (sk[e] + Bate_sig[e] + Beta_sig[e] + Beta2_sig[e] + Pi_sig[e]) * (sig[xs_pert][e][v][PERTid] / RESP) ** 1  for e in range(ene)]
+                adjoRes.ind.append([ind_2, dir_1, ind_1, ind_3, skk, Ns])
 
-            sens.append(s)
+                dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
 
-            ind_1= [ind_1[e] + Beta_sig[e] for e in range(ene)]
-            ind_2= [ind_2[e] + Pi_sig[e] for e in range(ene)]
-            ind_3= [ind_3[e] + Beta2_sig[e] for e in range(ene)]
-            dir_1= [dir_1[e] + Bate_sig[e] for e in range(ene)]
-            #ind_1= [ind_1[e] + Beta_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
-            #ind_2= [ind_2[e] + Pi_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
-            #ind_3= [ind_3[e] + Beta2_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
-            #dir_1= [dir_1[e] + Bate_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                SS = Ns1.copy()
 
-            # Ns = [Ns1[j] - (np.inner(G, Beta[j]) + (Ps * Pi[j])) + (fun.kSens(Gh, Psi,  N, k , j, v)) for j in range(Beta.shape[0])]
-            # adjoRes.ind.append([ind_2,dir_1,ind_1, sk, Nss])
+                old_stdout = sys.stdout  # backup current stdout
+                sys.stdout = open(os.devnull, "w")
+                Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose() * (dt), np.array(Ns))
+                sys.stdout = old_stdout  # reset old stdout
 
-            print('\t' + str(math.ceil(i / n * 100)) + "% complete", end='\r')
-            sys.stdout.flush()
 
-        adjoRes.ind.append([dir_1, ind_1, ind_2, ind_3, skk, S])
+                # adjoint power normalization
 
-    elif resp == 'nuclide' and 'xs' not in kwargs.keys():
+                PL = fun.updatePL(fun.pl, rr )
+                R  = fun.Bateman(rr)# - fun.onixD(PL)
+                Ps = (fun.I([Ns1, SS], [No, N],  R, dt) + ai) / P
 
-        Ns[respId] = 1
-        Nss = Ns.copy()
+                adjoRes.pow.append(Ps)
 
-        SS=Ns.copy()
+                # adjoint source
 
-        for i in range(n-1):
+                B = -dR -np.array(fun.Qs([No, N], [Ns1, SS], Ps, Phi, v, dt))
 
-            v = -2-i
+                adjoRes.source.append(np.array(B))
 
-            Psi = res.flux[v]
+                # adjoflux-shape algebra
 
-            Phi = float(res.phi[v])
+                A = fun.Boltz(No * where, sig, v, 1 / k).transpose()
 
-            C = np.matrix(res.M[v]).transpose()
 
-            k = res.keff[v]
+                #A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
+                A[1] = Gh
 
-            N = res.comp[v+1]
-            No = res.comp[v]
+                B[1] = 0
 
-            psi = fun.reshapePsi(Psi)
+                Gp = np.linalg.inv(A).dot(np.array(B))
 
-            rr = fun.rr(fun.sig, psi, Phi,v)
+                b = (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gp)) / (fun.boltzF(No * where, sig, v).dot(Psi).dot(Gh))
 
-            SM = res.ind[v+1].transpose() #- np.diag(np.ones(len(N)))
+                G = Gp - b * Gh
 
-            # homogeneous adjoint
+                adjoRes.flux.append(G)
 
-            A = fun.Boltz(No * where, sig, v, 1/k).transpose()
+                A = fun.Boltz(No * where, sig, v, 1 / k)
+                B = np.zeros(len(A[0])) -dR2
+                A[1] = Psi
+                B[1] = 0
+                G2 = np.linalg.inv(A).dot(np.array(B))
 
-            A[-1] = Psi
+                # step condition
 
-            B = np.zeros(len(A[0])).tolist()
+                lam = 1 / k
 
-            B[-1] = 1
+                Beta  = fun.beta(Psi, lam, No, v)
+                Beta2 = fun.beta2(Gh, lam, No, v)
 
-            Gh = np.linalg.inv(A).dot(B)
+                Pi = rr['fission'].copy()*sig['v']
 
-            adjoRes.homo.append(Gh)
+                Ns = [Ns1[j] + (np.inner(G, Beta[j]) - Ps * Pi[j]  + np.inner(G2, Beta2[j])) for j in range(Beta.shape[0])]
 
-            # keff sens
+                # SENSITIVITY
 
-            adjoRes.comp.append(Ns)
+                Beta_N  =  np.inner(G, Beta).tolist()
+                Beta2_N =  np.inner(G2, Beta2).tolist()
+                Bate_N  =  fun.bate(Psi, Phi, [No,N],[Ns1,SS], v, dt).tolist()
+                Pi_N    =  (-Pi*Ps).tolist()
+                #skk       =  fun.kSensSig(Gh, Psi, No, k, PERTid, xs_pert, v)
 
-            adjoRes.ind.append([ind_2,dir_1,ind_1, skk, dir_2, Nss])
 
-            dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
 
-            SS=Ns1.copy()
+                S = [S[e] + (ssk[e] + Bate_N[e] + Beta_N[e] + Beta2_N[e] + Pi_N[e]) * (N[e] / RESP) ** 0 for e in range(len(N))]
 
-            old_stdout = sys.stdout  # backup current stdout
-            sys.stdout = open(os.devnull, "w")
-            #Ns1 = odeint(fun.ODE2b, Ns, time, C).tolist()[::-1]
-            Ns2 = onix.salameche.CRAM16((C)*(dt), np.array(Ns))
-            sys.stdout = old_stdout  # reset old stdout
+                s = [s[e] + (ssk[e] + Bate_N[e] + Beta_N[e] + Beta2_N[e] + Pi_N[e]) * (N[e] / RESP) ** 1 for e in range(len(N))]
 
+                sens.append(s)
 
-            #Ns1  = onix.salameche.CRAM16((-SM)*(dt), np.array(Ns2))
-            Ns1 = SM.dot(Ns2)
-            #Ns1 = Ns2
+                ind_1= [ind_1[e] + Beta_N[e] for e in range(len(N))]
+                ind_2= [ind_2[e] + Pi_N[e] for e in range(len(N))]
+                ind_3= [ind_3[e] + Beta2_N[e] for e in range(len(N))]
+                dir_1= [dir_1[e] + Bate_N[e] for e in range(len(N))]
+                #ind_1= [ind_1[e] + Beta_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                #ind_2= [ind_2[e] + Pi_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                #ind_3= [ind_3[e] + Beta2_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                #dir_1= [dir_1[e] + Bate_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
 
-            # adjoint power normalization
+                # Ns = [Ns1[j] - (np.inner(G, Beta[j]) + (Ps * Pi[j])) + (fun.kSens(Gh, Psi,  N, k , j, v)) for j in range(Beta.shape[0])]
+                # adjoRes.ind.append([ind_2,dir_1,ind_1, sk, Nss])
 
-            PL=fun.updatePL(fun.pl, rr)
-            R=fun.onixR(PL)
-            Ps=fun.I([Ns1,SS],[No,N],R, dt) / P
+                print('\t' + str(math.ceil(i / n * 100)) + "% complete", end='\r')
+                sys.stdout.flush()
 
-            adjoRes.pow.append(Ps)
+            adjoRes.ind.append([ind_2, dir_1, ind_1, ind_3, skk, Ns])
 
-            # adjoint source
 
-            B = -np.array(fun.Qs([No,N],[Ns1,SS], Ps, Phi, v, dt))
+        elif resp == 'nuclide' and 'xs' not in kwargs.keys():
 
-            adjoRes.source.append(np.array(B))
+            Ns[respId] = 1
+            Ns1 = Ns.copy()
 
-            # adjoflux-shape algebra
+            SS=Ns.copy()
 
-            A = fun.Boltz(No * where, sig, v, 1/k).transpose()
+            for i in range(n-1):
 
-            p = nucData.ZAI.index('280580')
-            q = nucData.ZAI.index('280600')
+                v   = -2-i
+                red = -1
 
-            dNc = np.zeros(len(N))
-            dNc[p] = 1#No[p]
-            dNc[q] = 1#No[q]
+                Psi = res.flux[v]
 
-            #A[0]=fun.boltzF(No*where, sig, v).dot(Psi)
-            #A[0]=fun.Boltz(dNc*where, sig, v, 1/k).dot(Psi)
+                Phi = float(res.phi[v])
 
-            A[-1]=Gh
+                C = np.matrix(res.M[v]).transpose()
 
-            B[-1]=0
+                k = res.keff[v]
 
-            Gp = np.linalg.inv(A).dot(np.array(B))
+                N = res.comp[v+1]
+                No = res.comp[v]
 
-            b = (fun.boltzF(No*where, sig, v).dot(Psi).dot(Gp))/(fun.boltzF(No*where, sig, v).dot(Psi).dot(Gh))
-            c = (fun.Boltz(dNc * where, sig, v, 1 / k).dot(Psi).dot(Gp)) / (fun.Boltz(dNc * where, sig, v, 1 / k).dot(Psi).dot(Gh))
+                psi = fun.reshapePsi(Psi)
 
-            G = Gp + c*Gh*1 -b*Gh*0
+                rr = fun.rr(fun.sig, psi, Phi,v)
 
-            adjoRes.flux.append(G)
+                # homogeneous adjoint
 
-            # step condition
+                A = fun.Boltz(No * where, sig, v, 1/k).transpose()
 
+                A[red] = Psi
 
-            if resetK == True:
+                B = np.zeros(len(A[0])).tolist()
 
-                IMP  = (Ns[p] * No[p] + Ns[q] * No[q]) / ((fun.kSens(Gh, Psi, No, k, p, v)) * No[p] + (fun.kSens(Gh, Psi, No, k, q, v)) * No[q])
-                IMP2 = Ns[p] / (fun.kSens(Gh, Psi, No, k, p, v))
-                skk  = [(fun.kSens(Gh, Psi, No, k, j, v)) * IMP * (No[j]/No[p])**0 for j in range(len(N))]
-                ssk  = [fun.boltzF(No * where, sig, v, ).dot(Psi).dot(G) * (fun.kSens(Gh, Psi, No, k, j, v))  for j in range(len(N))]
-                sk   = [sk[j] + skk[j] for j in range(len(N))]
+                B[red] = 1
 
-            lam = 1 / k
+                Gh = np.linalg.inv(A).dot(B)
 
-            Beta = fun.beta(Psi, lam, No, v)
+                adjoRes.homo.append(Gh)
 
-            Pi = rr['fission'].copy()*sig['v']
+                # keff sens
 
-            ind_1= [ind_1[j] + np.inner(G, Beta[j]) for j in range(Beta.shape[0])]
-            ind_2= [ind_2[j] - Ps * Pi[j] for j in range(Beta.shape[0])]
-            dir_1= [dir_1[j] + Ns2[j]-Ns[j] for j in range(Beta.shape[0])]
-            dir_2= [dir_2[j] + Ns1[j]-Ns2[j] for j in range(Beta.shape[0])]
+                adjoRes.comp.append(Ns)
 
-            Ns  = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
-            Nss = [Ns[j]  + skk[j]  for j in range(Beta.shape[0])]
+                adjoRes.ind.append([ind_2, dir_1, ind_1, Ns])
 
+                dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
 
-            print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
-            sys.stdout.flush()
+                SS=Ns1.copy()
 
-        adjoRes.ind.append([ind_2, dir_1, ind_1, skk, dir_2, Nss])
+                old_stdout = sys.stdout  # backup current stdout
+                sys.stdout = open(os.devnull, "w")
+                Ns1 = onix.salameche.CRAM16((C)*(dt), np.array(Ns))
+                sys.stdout = old_stdout  # reset old stdout
 
-    elif resp == 'nuclide' and 'xs' in kwargs.keys() :
 
-        ind_1 = np.zeros(ene).tolist()
-        ind_2 = np.zeros(ene).tolist()
-        dir_1 = np.zeros(ene).tolist()
+                PL= fun.updatePL(fun.pl, rr)
+                #R= fun.onixR(PL)
+                R = fun.Bateman(rr) - fun.onixD(PL)
+                Ps= fun.I([Ns1,SS],[No,N],R, dt) / P
 
-        sens = []
+                adjoRes.pow.append(Ps)
 
-        RESP = res.comp[-1][respId]
+                # adjoint source
 
-        xs_pert = kwargs['xs']
+                B = -np.array(fun.Qs([No,N],[Ns1,SS], Ps, Phi, v, dt))
 
-        Ns[respId] = 1
-        Nss = Ns
+                adjoRes.source.append(np.array(B))
 
-        SS=Ns.copy()
+                # adjoflux-shape algebra
 
-        for i in range(n-1):
+                A = fun.Boltz(No * where, sig, v, 1/k).transpose()
 
-            v = -2-i
+                A[red]=fun.boltzF(No*where, sig, v).dot(Psi)
+                #A[0]=fun.Boltz(dNc*where, sig, v, 1/k).dot(Psi)
+                #A[-1]=Gh
 
-            Psi = res.flux[v]
+                B[red]=0
 
-            Phi = float(res.phi[v])
+                Gp = np.linalg.inv(A).dot(np.array(B))
 
-            C = res.M[v]
+                b = (fun.boltzF(No*where, sig, v).dot(Psi).dot(Gp))/(fun.boltzF(No*where, sig, v).dot(Psi).dot(Gh))
 
-            k = res.keff[v]
+                G = Gp + -b*Gh*0
 
-            N = res.comp[v+1]
-            No = res.comp[v]
+                adjoRes.flux.append(G)
 
-            psi = fun.reshapePsi(Psi)
+                # step condition
 
-            rr = fun.rr(fun.sig, psi, Phi,v)
+                lam = 1 / k
 
-            # homogeneous adjoint
+                Beta = fun.beta(Psi, lam, No, v)
 
-            A = fun.Boltz(No * where, sig, v, 1/k).transpose()
+                Pi = rr['fission'].copy()*sig['v']
 
-            A[1] = Psi
+                ind_1= [ind_1[j] + np.inner(G, Beta[j]) for j in range(Beta.shape[0])]
+                ind_2= [ind_2[j] - Ps * Pi[j] for j in range(Beta.shape[0])]
+                dir_1= [dir_1[j] + Ns1[j]-Ns[j] for j in range(Beta.shape[0])]
 
-            B = np.zeros(len(A[0])).tolist()
+                Ns  = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
 
-            B[1] = 1
+                print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
+                sys.stdout.flush()
 
-            Gh = np.linalg.inv(A).dot(B)
+            adjoRes.ind.append([ind_2, dir_1, ind_1, Ns])
 
-            adjoRes.homo.append(Gh)
+        elif resp == 'nuclide' and 'xs' in kwargs.keys() :
 
-            # keff sens
+            ind_1 = np.zeros(ene).tolist()
+            ind_2 = np.zeros(ene).tolist()
+            dir_1 = np.zeros(ene).tolist()
 
-            adjoRes.comp.append(Ns)
+            sens = []
+
+            RESP = res.comp[-1][respId]
+
+            xs_pert = kwargs['xs']
+
+            Ns[respId] = 1
+            Nss = Ns
+
+            SS=Ns.copy()
+
+            for i in range(n-1):
+
+                v = -2-i
+
+                Psi = res.flux[v]
+
+                Phi = float(res.phi[v])
+
+                C = res.M[v]
+
+                k = res.keff[v]
+
+                N = res.comp[v+1]
+                No = res.comp[v]
+
+                psi = fun.reshapePsi(Psi)
+
+                rr = fun.rr(fun.sig, psi, Phi,v)
+
+                # homogeneous adjoint
+
+                A = fun.Boltz(No * where, sig, v, 1/k).transpose()
+
+                A[1] = Psi
+
+                B = np.zeros(len(A[0])).tolist()
+
+                B[1] = 1
+
+                Gh = np.linalg.inv(A).dot(B)
+
+                adjoRes.homo.append(Gh)
+
+                # keff sens
+
+                adjoRes.comp.append(Ns)
+
+                adjoRes.ind.append([dir_1, ind_1, ind_2, S])
+
+                dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
+
+                SS=Ns1.copy()
+
+                old_stdout = sys.stdout  # backup current stdout
+                sys.stdout = open(os.devnull, "w")
+                #Ns1 = odeint(fun.ODE2b, Ns, time, C).tolist()[::-1]
+                Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose()*(dt), np.array(Ns))
+                sys.stdout = old_stdout  # reset old stdout
+
+                # adjoint power normalization
+
+                PL=fun.updatePL(fun.pl, rr)
+                R=fun.onixR(PL)
+                Ps=fun.I([Ns1,SS],[No,N],R, dt)/P
+
+                adjoRes.pow.append(Ps)
+
+                # adjoint source
+
+                B = -np.array(fun.Qs([No,N],[Ns1,SS], Ps, Phi, v, dt))
+
+                adjoRes.source.append(np.array(B))
+
+                # adjoflux-shape algebra
+
+                A = fun.Boltz(No * where, sig, v, 1/k).transpose()
+
+                A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
+                #A[1]=Gh
+
+                B[1]=0
+
+                Gp = np.linalg.inv(A).dot(np.array(B))
+
+                b = (fun.boltzF(No*where, sig, v).dot(Psi).dot(Gp))/(fun.boltzF(No*where, sig, v).dot(Psi).dot(Gh))
+
+                G = Gp - b*Gh*0
+
+                adjoRes.flux.append(G)
+
+                # step condition
+
+                lam = 1 / k
+
+                Beta = fun.beta(Psi, lam, No, v)
+
+                Pi = rr['fission'].copy()*sig['v']
+
+                Ns = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
+
+                # SENSITIVITY
+
+                Beta_sig =  fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)
+                Bate_sig =  fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
+                Pi_sig   =  -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Ps
+
+                # *sig['18'][e][v][PERTid]/RESP
+
+                S = [S[e] + (Bate_sig[e] + Beta_sig[e] + Pi_sig[e])*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+
+                ind_1= [ind_1[e] + Beta_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                ind_2= [ind_2[e] + Pi_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                dir_1= [dir_1[e] + Bate_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+
+                print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
+                sys.stdout.flush()
 
             adjoRes.ind.append([dir_1, ind_1, ind_2, S])
 
-            dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
+    elif resetK == True:
 
-            SS=Ns1.copy()
+        if   resp == 'nuclide' and 'xs' not in kwargs.keys():
 
-            old_stdout = sys.stdout  # backup current stdout
-            sys.stdout = open(os.devnull, "w")
-            #Ns1 = odeint(fun.ODE2b, Ns, time, C).tolist()[::-1]
-            Ns1 = onix.salameche.CRAM16(np.matrix(C).transpose()*(dt), np.array(Ns))
-            sys.stdout = old_stdout  # reset old stdout
+            Ns[respId] = 1
+            Nss = Ns.copy()
 
-            # adjoint power normalization
+            SS=Ns.copy()
 
-            PL=fun.updatePL(fun.pl, rr)
-            R=fun.onixR(PL)
-            Ps=fun.I([Ns1,SS],[No,N],R, dt)/P
+            for i in range(n-1):
 
-            adjoRes.pow.append(Ps)
+                v = -2-i
 
-            # adjoint source
+                Psi = res.flux[v]
 
-            B = -np.array(fun.Qs([No,N],[Ns1,SS], Ps, Phi, v, dt))
+                Phi = float(res.phi[v])
 
-            adjoRes.source.append(np.array(B))
+                C = np.matrix(res.M[v]).transpose()
 
-            # adjoflux-shape algebra
+                k = res.keff[v]
 
-            A = fun.Boltz(No * where, sig, v, 1/k).transpose()
+                N = res.comp[v+1]
+                No = res.comp[v]
 
-            A[1]=fun.boltzF(No*where, sig, v).dot(Psi)
-            #A[1]=Gh
+                psi = fun.reshapePsi(Psi)
 
-            B[1]=0
+                rr = fun.rr(fun.sig, psi, Phi,v)
 
-            Gp = np.linalg.inv(A).dot(np.array(B))
+                SM = res.ind[v+1].transpose() #- np.diag(np.ones(len(N)))
 
-            b = (fun.boltzF(No*where, sig, v).dot(Psi).dot(Gp))/(fun.boltzF(No*where, sig, v).dot(Psi).dot(Gh))
+                # homogeneous adjoint
 
-            G = Gp - b*Gh*0
+                A = fun.Boltz(No * where, sig, v, 1/k).transpose()
 
-            adjoRes.flux.append(G)
+                A[-1] = Psi
 
-            # step condition
+                B = np.zeros(len(A[0])).tolist()
 
-            lam = 1 / k
+                B[-1] = 1
 
-            Beta = fun.beta(Psi, lam, No, v)
+                Gh = np.linalg.inv(A).dot(B)
 
-            Pi = rr['fission'].copy()*sig['v']
+                adjoRes.homo.append(Gh)
 
-            Ns = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
+                # keff sens
 
-            # SENSITIVITY
+                adjoRes.comp.append(Ns)
 
-            Beta_sig =  fun.betaSig(Psi, lam, xs_pert, No, G, PERTid, v)
-            Bate_sig =  fun.bateSig(Psi, Phi, xs_pert, [No,N],[Ns1,SS], PERTid, v, dt)
-            Pi_sig   =  -fun.PiSig(Psi, Phi, xs_pert, No, PERTid, v)*Ps
+                adjoRes.ind.append([ind_2,dir_1,ind_1, skk, dir_2, Nss])
 
-            # *sig['18'][e][v][PERTid]/RESP
+                dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
 
-            S = [S[e] + (Bate_sig[e] + Beta_sig[e] + Pi_sig[e])*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                SS=Ns1.copy()
 
-            ind_1= [ind_1[e] + Beta_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
-            ind_2= [ind_2[e] + Pi_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
-            dir_1= [dir_1[e] + Bate_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+                old_stdout = sys.stdout  # backup current stdout
+                sys.stdout = open(os.devnull, "w")
+                Ns2 = onix.salameche.CRAM16((C)*(dt), np.array(Ns))
+                sys.stdout = old_stdout  # reset old stdout
 
-            print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
-            sys.stdout.flush()
 
-        adjoRes.ind.append([dir_1, ind_1, ind_2, S])
+                #Ns1  = onix.salameche.CRAM16((-SM)*(dt), np.array(Ns2))
+                Ns1 = SM.dot(Ns2)
+                #Ns1 = Ns2
+
+                # adjoint power normalization
+
+                PL=fun.updatePL(fun.pl, rr)
+                R=fun.onixR(PL)
+                Ps=fun.I([Ns1,SS],[No,N],R, dt) / P
+
+                adjoRes.pow.append(Ps)
+
+                # adjoint source
+
+                B = -np.array(fun.Qs([No,N],[Ns1,SS], Ps, Phi, v, dt))
+
+                adjoRes.source.append(np.array(B))
+
+                # adjoflux-shape algebra
+
+                A = fun.Boltz(No * where, sig, v, 1/k).transpose()
+
+                p = nucData.ZAI.index('280580')
+                q = nucData.ZAI.index('280600')
+
+                dNc = np.zeros(len(N))
+                dNc[p] = 1#No[p]
+                dNc[q] = 1#No[q]
+
+                #A[0]=fun.boltzF(No*where, sig, v).dot(Psi)
+                #A[0]=fun.Boltz(dNc*where, sig, v, 1/k).dot(Psi)
+
+                A[-1]=Gh
+
+                B[-1]=0
+
+                Gp = np.linalg.inv(A).dot(np.array(B))
+
+                b = (fun.boltzF(No*where, sig, v).dot(Psi).dot(Gp))/(fun.boltzF(No*where, sig, v).dot(Psi).dot(Gh))
+                c = (fun.Boltz(dNc * where, sig, v, 1 / k).dot(Psi).dot(Gp)) / (fun.Boltz(dNc * where, sig, v, 1 / k).dot(Psi).dot(Gh))
+
+                G = Gp + c*Gh*1 -b*Gh*0
+
+                adjoRes.flux.append(G)
+
+                # step condition
+
+
+                if resetK == True:
+
+                    IMP  = (Ns[p] * No[p] + Ns[q] * No[q]) / ((fun.kSens(Gh, Psi, No, k, p, v)) * No[p] + (fun.kSens(Gh, Psi, No, k, q, v)) * No[q])
+                    IMP2 = Ns[p] / (fun.kSens(Gh, Psi, No, k, p, v))
+                    skk  = [(fun.kSens(Gh, Psi, No, k, j, v)) * IMP * (No[j]/No[p])**0 for j in range(len(N))]
+                    ssk  = [fun.boltzF(No * where, sig, v, ).dot(Psi).dot(G) * (fun.kSens(Gh, Psi, No, k, j, v))  for j in range(len(N))]
+                    sk   = [sk[j] + skk[j] for j in range(len(N))]
+
+                lam = 1 / k
+
+                Beta = fun.beta(Psi, lam, No, v)
+
+                Pi = rr['fission'].copy()*sig['v']
+
+                ind_1= [ind_1[j] + np.inner(G, Beta[j]) for j in range(Beta.shape[0])]
+                ind_2= [ind_2[j] - Ps * Pi[j] for j in range(Beta.shape[0])]
+                dir_1= [dir_1[j] + Ns2[j]-Ns[j] for j in range(Beta.shape[0])]
+                dir_2= [dir_2[j] + Ns1[j]-Ns2[j] for j in range(Beta.shape[0])]
+
+                Ns  = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
+                Nss = [Ns[j]  + skk[j]  for j in range(Beta.shape[0])]
+
+
+                print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
+                sys.stdout.flush()
+
+            adjoRes.ind.append([ind_2, dir_1, ind_1, skk, dir_2, Nss])
+
+        else:
+
+            print('K-reset is only possible for nuclide integral responses')
+
+            return
 
     print("100% complete                ", end='\r'+'\n\n' )
 
@@ -908,9 +1182,9 @@ def massPlot(res):
         matElse=['Ni', 'Ni', 'boro']
 
     if nucData.model[:3] == 'HEU':
-        isoElse = ['280580', '280600', '50100', '50100']
-        regElse=[0, 0, 1, 2]
-        matElse=['Ni', 'Ni', 'boro', 'boro']
+        isoElse = ['280580', '280600', '50100']
+        regElse=[0, 0, 1]
+        matElse=['Ni', 'Ni', 'boro']
 
     prezz = []
 
@@ -1088,7 +1362,7 @@ def adjoPlot(res, adjoRes, **kwargs):
 
     resp = kwargs['resp']
 
-    if resp=='nuclide':
+    if resp =='nuclide':
 
         c = nucData.getMM(ZAI[respId]) / 6.022E+23
         resp = nucData.nuc[respId].name

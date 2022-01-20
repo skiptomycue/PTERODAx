@@ -132,7 +132,7 @@ def boltzL(N, sigma, t, **kwargs):
 
     A = buildPozz(N, sigma, t, **kwargs)
 
-    if N.ravel()[-1] == 0:
+    if N.ravel()[-1] == 0 or  N.ravel()[-2] == 0 :
         S=S*0
         T=T*0
 
@@ -296,7 +296,7 @@ def Bateman(rr):
 
         if nucData.ZAI[i] in burn:
 
-            M[i,i]+=-rr['removal'][i]
+            M[i,i]+= -rr['removal'][i]
 
     return tuple(map(tuple, M))
 
@@ -324,6 +324,7 @@ def kSens(Gh, Psi, N, k, pertId, t):
 
     dN = np.zeros(len(N))
     dN[pertId] = 1
+
 
     num1 = tramezzino(Gh, Psi, np.matrix(Boltz(dN*where, sig, t, 1/k)))
     num = tramezzino(Gh, Psi, np.matrix(Boltz(N*where, sig, t, 1/k)))
@@ -372,7 +373,6 @@ def beta(Psi, lam, N, t):
         dN[i]  = 1
         dN[-1] = 0
 
-
         DN = dN * where
 
         BETA.append(Boltz(DN, sig, t, lam).dot(np.array(Psi)))
@@ -398,6 +398,29 @@ def beta2(Gh, lam, N, t):
         dN = np.zeros(len(N))
 
     return np.array(BETA)
+
+def bate(Psi, Phi, N, Ns, t, dt):
+
+    BATE = []
+    PSI = reshapePsi(Psi)
+    dN = np.zeros(np.array(N).shape)
+
+
+    for j in range(len(where[0])):
+
+        dN[0][j]  = 1
+        dN[1][j]  = 1
+
+        RR = rr(sig,PSI,Phi,t)
+        PL = updatePL(pl,RR)
+        R = Bateman(RR)# - onixD(PL)
+
+        BATE.append(I(Ns,dN,R, dt))
+
+        dN = np.zeros(np.array(N).shape)
+
+    return np.array(BATE)
+
 
 def pi(Psi, Phi):
     sf = np.array(sig['18'])
@@ -494,7 +517,7 @@ def bateSig(Psi, Phi, pert, N, Ns, id, t, dt):
         RR = rr(XS,PSI,Phi,t)
         PL = updatePL(pl,RR)
 
-        R = onixR(PL)
+        R = Bateman(RR) - onixD(PL)
 
         BATE.append(I(Ns,N,R, dt))
 

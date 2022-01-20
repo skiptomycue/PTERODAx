@@ -38,7 +38,7 @@ def cvxRoll(oldpath, path):
             for element in srot:
                 textfile.write(element + "\n")
             textfile.close()
-#cvxRoll('COVX/old_56/', path)
+#cvxRoll('COVX/OLD/', path)
 
 def buildMTX(lines, l, z):
 
@@ -67,7 +67,6 @@ def buildMTX(lines, l, z):
     else:
 
         print(z+'-'+words[2]+' is corrupt')
-
 def checkMTX(lines, l, z):
 
     words = lines[l].lower().split()
@@ -105,7 +104,6 @@ def shop():
                 if '7d' in lines[l][0:3]:
 
                     checkMTX(lines, l, z)
-
 
 cvx = {}
 

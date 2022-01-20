@@ -10,4 +10,6 @@ __pycache__/
 mdep
 mdep.py
 results/
-
+access
+matrix.py
+reset.py
