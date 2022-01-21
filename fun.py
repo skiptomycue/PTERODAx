@@ -48,7 +48,7 @@ def buildFiss(N, sigma, t, **kwargs):
     for i in range(ene):
         for j in range(ene):
 
-            F[i][j] = np.diag(N.dot(sigma['18'][i][t] * sig['nu'][i])) * chi[j]
+            F[i][j] = np.diag(N.dot(sigma['18'][i][t] * sigma['452'][i][t])) * chi[j]
 
     mtx = np.vstack(np.dstack(np.array(F)))
 
@@ -467,7 +467,23 @@ def dR2(Psi, Gh, N, k, t):
 
 ### ND ###
 
-def betaSig(Psi, lam, pert, N, G, id, t):
+def dSig(pertId, pertMT, e, t):
+
+    if   pertMT != '452':
+
+            XS = copy.deepcopy(nucData.xs)
+            XS[pertMT][e][t][pertId] = 1
+            XS['removal'][e][t][pertId] = 1
+
+    elif pertMT == '452':
+
+            XS = copy.deepcopy(nucData.xs)
+            XS[pertMT][e][t][pertId] = 1
+            XS['18'][e][t][pertId] = copy.deepcopy(sig['18'][e][t][pertId])
+
+    return XS
+
+def betaSig(Psi, lam, pertMT, N, G, pertId, t):
 
     M = N.copy()
     BETA = []
@@ -475,9 +491,7 @@ def betaSig(Psi, lam, pert, N, G, id, t):
 
     for e in range(ene):
 
-        XS = copy.deepcopy(nucData.xs)
-        XS[pert][e][t][id]=1
-        XS['removal'][e][t][id]=1
+        XS = dSig(pertId, pertMT, e, t)
 
         B = Boltz(M * where, XS, t, lam)
 
@@ -485,7 +499,7 @@ def betaSig(Psi, lam, pert, N, G, id, t):
 
     return np.array(BETA)
 
-def beta2Sig(Gh, lam, pert, N, G2, id, t):
+def beta2Sig(Gh, lam, pertMT, N, G2, pertId, t):
 
     M = N.copy()
     BETA = []
@@ -493,9 +507,7 @@ def beta2Sig(Gh, lam, pert, N, G2, id, t):
 
     for e in range(ene):
 
-        XS = copy.deepcopy(nucData.xs)
-        XS[pert][e][t][id]=1
-        XS['removal'][e][t][id]=1
+        XS = dSig(pertId, pertMT, e, t)
 
         B = Boltz(M * where, XS, t, lam).transpose()
 
@@ -503,16 +515,14 @@ def beta2Sig(Gh, lam, pert, N, G2, id, t):
 
     return np.array(BETA)
 
-def bateSig(Psi, Phi, pert, N, Ns, id, t, dt):
+def bateSig(Psi, Phi, pertMT, N, Ns, pertId, t, dt):
 
     BATE = []
     PSI = reshapePsi(Psi)
 
     for e in range(ene):
 
-        XS = copy.deepcopy(nucData.xs)
-        XS[pert][e][t][id]=1
-        XS['removal'][e][t][id]=1
+        XS = dSig(pertId, pertMT, e, t)
 
         RR = rr(XS,PSI,Phi,t)
         PL = updatePL(pl,RR)
@@ -523,21 +533,18 @@ def bateSig(Psi, Phi, pert, N, Ns, id, t, dt):
 
     return np.array(BATE)
 
-def PiSig(Psi, Phi, pert, N, id, t):
+def PiSig(Psi, Phi, pertMT, N, pertId, t):
 
     PI = []
     PSI = reshapePsi(Psi)
 
     for e in range(ene):
 
-        XS = copy.deepcopy(nucData.xs)
-        XS[pert][e][t][id]=1
-        XS['removal'][e][t][id]=1
-
+        XS = dSig(pertId, pertMT, e, t)
 
         RR = rr(XS,PSI,Phi,t)
 
-        PI.append(RR['fission'][id]*sig['v'][id]*N[id])
+        PI.append(RR['fission'][pertId]*sig['v'][pertId]*N[pertId])
 
     return np.array(PI)
 
@@ -549,9 +556,7 @@ def kSensSig(Gh, Psi, N, k, pertId, pertMT, t):
 
     for e in range(ene):
 
-        XS = copy.deepcopy(nucData.xs)
-        XS[pertMT][e][t][pertId]=1
-        XS['removal'][e][t][pertId]=1
+        XS = dSig(pertId, pertMT, e, t)
 
         num1 = tramezzino(Gh, Psi, np.matrix(Boltz(M*where, XS, t, 1/k)))
         num = tramezzino(Gh, Psi, np.matrix(Boltz(N*where, sig, t, 1/k)))

@@ -1,21 +1,21 @@
+import config
+import serpent
 import numpy as np
-import json
-import math
 import serpentTools as ST
-from serpentTools.settings import rc
 from periodictable import elements
 import matplotlib.pyplot as plt
-import serpent
 from datetime import datetime
+import copy
+
 
 startNuc = datetime.now()
 
 
-model     = 'UO2/NEW'                                    # INPUT MODEL
-energy    =  44                                      # INPUT ENERGY GROUPS
-PASSI     =  100                                      # INPUT STEP NUMBER
-fpSwitch  =  0                                       # SWITCH TO FULL NUCLIDE CHART
-hetSwitch =  0                                       # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
+model     = config.model                                    # INPUT MODEL
+energy    = config.energy                                      # INPUT ENERGY GROUPS
+PASSI     = config.PASSI                                       # INPUT STEP NUMBER
+fpSwitch  = config.fpSwitch                                        # SWITCH TO FULL NUCLIDE CHART
+hetSwitch = config.hetSwitch                                        # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
 
 ### INITS ###
 
@@ -52,6 +52,8 @@ chi  = res.universes[UNI[fuelId],0.0, 0, 0.0].infExp['infChit']
 grid = res.universes[UNI[fuelId],0.0, 0, 0.0].groups[::-1]
 ene  = len(chi)
 
+reaz = ['fission', '(n,gamma)', '(n,2n)', '(n,3n)', '(n,p)', '(n,a)','nubar', 'removal', 'sca']
+MT = ['18', '102', '16', '17', '103', '107', '452', 'removal', 'sca']
 
 ### FUNCTIONS ###
 
@@ -485,8 +487,9 @@ def buildNuc(zai, xs, CB, CF, CN):
     MAT = []
     NOM = []
 
-    nuU5 = np.array([2.65] * int((ene / 2)) + [2.43] * int((ene / 2)))
-    nuPu = np.array([3.16] * int((ene / 2)) + [2.86] * int((ene / 2)))
+    nuU5   = np.array([[2.65] * int((ene / 2)) + [2.43] * int((ene / 2))]*PASSI).tolist()
+    nuPu   = np.array([[3.16] * int((ene / 2)) + [2.86] * int((ene / 2))]*PASSI).tolist()
+    nuZero = np.array([[0] * ene]*PASSI).tolist()
 
     vU5 = 200.7E+6 * 1.6E-19  # J/fiss
     vPu = 207.0E+6 * 1.6E-19
@@ -515,11 +518,12 @@ def buildNuc(zai, xs, CB, CF, CN):
         else:
 
             for z in zai[i]:
-                elem = Nuclide(zai, i, z, mat[i], vol[i], xs, j, CB, CF, CN)
+                elem = Nuclide(zai, i, z, mat[i], vol[i], xs, j, CB, CF, CN, nu=nuZero)
                 nuc.append(elem)
                 MAT.append(elem.mat)
                 NOM.append(elem.name)
                 j+=1
+
 
     return nuc, MAT, NOM
 
@@ -527,7 +531,7 @@ def buildSig(nuc):
 
     sig = {}
 
-    for key in REACTIONS+['sca']:
+    for key in REACTIONS+['sca', 'nu']:
 
         sig[key]=[]
 
@@ -537,7 +541,7 @@ def buildSig(nuc):
 
         sig[key] = np.array(sig[key]).transpose()
 
-    for key in ['nu', 'gam', 'lam', 'v']:
+    for key in ['gam', 'lam', 'v']:
 
         sig[key]=[]
 
@@ -549,6 +553,7 @@ def buildSig(nuc):
         sig[key] = np.array(sig[key], dtype=object).transpose()
 
     sig['removal'] = np.array(sig['101'], dtype=object) + np.array(sig['18'], dtype=object)
+    sig['452']     = copy.deepcopy(sig['nu'])
 
     return sig
 
@@ -619,5 +624,3 @@ endNuc = datetime.now()
 
 nuc[ZAI.index('922350')].name = 'Uranium-235'
 nuc[ZAI.index('922380')].name = 'Uranium-238'
-
-

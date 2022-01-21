@@ -10,25 +10,26 @@ import math
 import serpentTools as ST
 import onix
 from matplotlib.lines import Line2D
+import config
 import fun
 import nucData
 import serpent
 import json
 
-PERT     = ['922350', '922380']#, '280580', '50100']#, '10020']                                    # INPUT PERTURBATION NUCLIDE
-RESP_NUC =  '922380'                                               # OUTPUT RESPONSE NUCLIDE
-RESPONSE =  'keff'                                                # OUTPUT NUCLIDE, KEFF OR NONE
-ND       =  False                                                # SWITCH ND PERTURBATION
-MT       =  '18'                                                   # INPUT PERTURBATION XS
-pert     =  1.01                                                   # INPUT PERTURBATION %
-resetK   =  0
+PERT     = config.PERT
+RESP_NUC = config.RESP_NUC
+RESPONSE = config.RESPONSE
+ND       = config.ND
+MT       = config.MT
+pert     = config.pert
+resetK   = config.resetK
 
 sens_formula = False
 ### INITS ###
 
 respId = nucData.ZAI.index(RESP_NUC)
 PERTid = nucData.ZAI.index(PERT[0])
-reac = fun.reaz[fun.MT.index(MT)]
+reac = nucData.reaz[nucData.MT.index(MT)]
 P = serpent.power[nucData.model]
 model = nucData.model
 where = nucData.where
@@ -239,7 +240,10 @@ def pertBlock(res, **kwargs):
             for t in range(nucData.steps):
 
                 sigma[MT][e][t][pertId] = sigma[MT][e][t][pertId] * pert
-                sigma['removal'][e][t][pertId] += sigma[MT][e][t][pertId] * (pert-1)
+
+                if MT != '452':
+
+                    sigma['removal'][e][t][pertId] += sigma[MT][e][t][pertId] * (pert-1)
 
             pertRes = directStep(zeroAt, sigma)
 
@@ -1601,7 +1605,7 @@ def bunSnap(resu, res, resp, name, xs, BOL):
     for flux in resu:
 
         #y = np.array([flux[e] * sig[MT][e][nodo][PERTid] * (pert-1)  for e in range(ene)] + [0]) *nucData.getMM(RESP_NUC)/6.022E+23
-        y = np.array( [0] + [flux[e] * sig[MT][e][nodo][PERTid] * (pert-1)  for e in range(ene)] ) * c
+        y = np.array( [0] + [flux[e] * sig[MT][e][nodo][PERTid] * (pert-1)  for e in range(ene)] ) * c * pcm
         axs.step(x, y, col[j], linestyle= lin[j], where = 'pre', label=lab[j])
         tit = 'EOL '+resp+' Sensitivity to '+nucData.nuc[PERTid].name+' '+xs+' cross section\n'
         axs.set(xlabel='Energy [MeV]', ylabel=title, title=tit)
@@ -1614,7 +1618,7 @@ def bunSnap(resu, res, resp, name, xs, BOL):
     #y2 = [res.pert['atoms'][e]/RESP/(pert-1) for e in range(ene)] + [0]
     #y2 = [res.pert['atoms'][e]/(sig[MT][e][nodo][PERTid]*(pert-1)) for e in range(ene)] + [0]
     #y2 = np.array(res.pert['atoms'] + [0]) *nucData.getMM(RESP_NUC)/6.022E+23
-    y2 = (np.array([0] + sibyl)) * c
+    y2 = (np.array([0] + sibyl)) * c * pcm
 
     axs.step(x, y2, 'red', linestyle=lin[-1], where='pre', label='SIBYL DIRECT')
     axs.legend(loc='best')
