@@ -16,7 +16,7 @@ import nucData
 import serpent
 import json
 
-PERT     = config.PERT
+PERT     = config.PERT_NUC
 RESP_NUC = config.RESP_NUC
 RESPONSE = config.RESPONSE
 ND       = config.ND

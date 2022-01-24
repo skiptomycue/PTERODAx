@@ -546,6 +546,11 @@ def PiSig(Psi, Phi, pertMT, N, pertId, t):
 
         PI.append(RR['fission'][pertId]*sig['v'][pertId]*N[pertId])
 
+
+    if pertMT == '452':
+
+        PI =( np.array(PI)*0).tolist()
+
     return np.array(PI)
 
 def kSensSig(Gh, Psi, N, k, pertId, pertMT, t):

@@ -115,3 +115,28 @@ shop()
 
 with open('COVX/mtx.json', 'w') as fp:
     json.dump(cvx, fp)
+
+
+
+
+config.add_section('sibyl')
+
+config.set('sibyl', 'model', 'UO2')
+config.set('sibyl', 'energy', "44")
+config.set('sibyl', 'PASSI', '10')
+config.set('sibyl', 'fpSwitch', 'False')
+config.set('sibyl', 'hetSwitch', 'False')
+
+config.add_section('pterodax')
+
+config.set('pterodax', 'PERT_NUC', ['922350','922380'])
+config.set('pterodax', 'RESP_NUC', '942390')
+config.set('pterodax', 'RESPONSE', 'keff')
+config.set('pterodax', 'ND', 'True')
+config.set('pterodax', 'MT', '452')
+config.set('pterodax', 'pert', '1.01')
+config.set('pterodax', 'resetK', 'False')
+config.set('pterodax', 'sens_formula', 'False')
+
+with open(r"configfile.ini", 'w') as configfile:
+    config.write(configfile)
