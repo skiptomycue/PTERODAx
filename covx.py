@@ -5,7 +5,7 @@ from matplotlib.colors import LogNorm
 import numpy as np
 from periodictable import elements
 
-PERT = [('922350', '18'), ('922350', '452'), ('922350', '102'), ('922380', '102')]
+PERT = [('922350', '18'), ('922350', '452'), ('922350', '102'), ('922380', '18'), ('922380', '452'), ('922380', '102')]
 
 zailist  = ['922350', '922380', '942390', '80160', '10010']
 pertlist = ['tot', 'ela', 'sab', 'inl', '102', '18', '452', 'nxn']

@@ -12,12 +12,12 @@ import serpent
 
 ### NUCLEAR DATA ###
 
-sig   = nucData.sig
-steps = nucData.steps
-chi   = nucData.chi
-where = nucData.where
-ene = nucData.ene
-reg = 3
+sig    = nucData.sig
+steps  = nucData.steps
+chi    = nucData.chi
+where  = nucData.where
+ene    = nucData.ene
+reg    = 3
 lenPsi = ene*reg
 
 ### Results object ###
@@ -549,7 +549,7 @@ def PiSig(Psi, Phi, pertMT, N, pertId, t):
 
     if pertMT == '452':
 
-        PI =( np.array(PI)*0).tolist()
+        PI =(np.array(PI)*0).tolist()
 
     return np.array(PI)
 

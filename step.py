@@ -23,6 +23,7 @@ ND       = config.ND
 MT       = config.MT
 pert     = config.pert
 resetK   = config.resetK
+direct   = 0
 
 sens_formula = False
 ### INITS ###
@@ -76,7 +77,7 @@ def zeroStep(At, sig):
     AA = fun.Boltz(N, sig, 0, 1 / k, ribalta=True)
 
 
-    fun.plotBU(np.matrix(AA), 'Regions_mtx')
+    #fun.plotBU(np.matrix(AA), 'Regions_mtx')
     #fun.plotBU(np.matrix(A), 'Transport_mtx')
 
 
@@ -110,7 +111,7 @@ def zeroStep(At, sig):
 
     res.M.append(C)
 
-    fun.plotBU(np.matrix(C), 'Depletion_mtx')
+    #fun.plotBU(np.matrix(C), 'Depletion_mtx')
 
     return res, resK
 
@@ -199,6 +200,10 @@ def pertBlock(res, **kwargs):
 
     res.pert['atoms'] = []
     res.pert['keff'] = []
+
+    if direct == False:
+
+        return
 
     ND = kwargs['ND']
 
@@ -498,7 +503,7 @@ def adjoStep(res, **kwargs):
                 # adjoint power normalization
 
                 PL = fun.updatePL(fun.pl, rr )
-                R = fun.onixR(PL)
+                R = fun.Bateman(rr) - fun.onixD(PL)
                 Ps = (fun.I([Ns1, SS], [No, N],  R, dt) + ai) / P
 
                 adjoRes.pow.append(Ps)
@@ -1135,10 +1140,11 @@ def UncertBlock(sens):
     with open('COVX/SENS.json') as fp:
         res_sens = json.load(fp)
 
-    res_sens[response][perturb][MT] = sens
+    R = copy.deepcopy(res_sens)
+    R[response][perturb][MT] = sens
 
     with open('COVX/SENS.json', 'w') as fp:
-        json.dump(res_sens, fp)
+        json.dump(R, fp)
 
 ### PLOTS ###
 
@@ -1618,9 +1624,12 @@ def bunSnap(resu, res, resp, name, xs, BOL):
     #y2 = [res.pert['atoms'][e]/RESP/(pert-1) for e in range(ene)] + [0]
     #y2 = [res.pert['atoms'][e]/(sig[MT][e][nodo][PERTid]*(pert-1)) for e in range(ene)] + [0]
     #y2 = np.array(res.pert['atoms'] + [0]) *nucData.getMM(RESP_NUC)/6.022E+23
-    y2 = (np.array([0] + sibyl)) * c * pcm
 
-    axs.step(x, y2, 'red', linestyle=lin[-1], where='pre', label='SIBYL DIRECT')
+    if direct == True:
+
+        y2 = (np.array([0] + sibyl)) * c * pcm
+        axs.step(x, y2, 'red', linestyle=lin[-1], where='pre', label='SIBYL DIRECT')
+
     axs.legend(loc='best')
     axs.set_xlim(1E-9, 1E+2)
 
@@ -1638,7 +1647,7 @@ def main(**kwargs):
 
     stampa = 1
 
-    if nucData.fpSwitch == True or resetK == True or stampa == 1:
+    if nucData.fpSwitch == True or resetK == True or stampa == 1 and ND == False:
 
         massPlot(res)
         paraPlot(res.keff, 'keff', serp=True, paraserp=[nucData.time, nucData.keff])
