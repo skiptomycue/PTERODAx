@@ -31,9 +31,9 @@ MXT=ST.MicroXSTuple
 
 ### TIME STEPS ###
 
-tempo_het  = np.linspace(0,5,10).tolist() + np.linspace(5,giorni/10,20).tolist()[1:] + np.linspace(giorni/10,giorni,100).tolist()[1:]
+tempo_het  = np.linspace(0,5,10).tolist() + np.linspace(5,giorni/10,20).tolist()[1:] + np.linspace(giorni/10,giorni,50).tolist()[1:]
 tempo_homo = np.linspace(0, giorni, PASSI)
-tempo = tempo_homo
+tempo = tempo_het
 steps = len(tempo)
 nodo = min([int(len(dep.days)/2),int(len(tempo)/2)])
 
@@ -487,9 +487,9 @@ def buildNuc(zai, xs, CB, CF, CN):
     MAT = []
     NOM = []
 
-    nuU5   = np.array([[2.65] * int((ene / 2)) + [2.43] * int((ene / 2))]*PASSI).tolist()
-    nuPu   = np.array([[3.16] * int((ene / 2)) + [2.86] * int((ene / 2))]*PASSI).tolist()
-    nuZero = np.array([[0] * ene]*PASSI).tolist()
+    nuU5   = np.array([[2.65] * int((ene / 2)) + [2.43] * int((ene / 2))]*steps).tolist()
+    nuPu   = np.array([[3.16] * int((ene / 2)) + [2.86] * int((ene / 2))]*steps).tolist()
+    nuZero = np.array([[0] * ene]*steps).tolist()
 
     vU5 = 200.7E+6 * 1.6E-19  # J/fiss
     vPu = 207.0E+6 * 1.6E-19

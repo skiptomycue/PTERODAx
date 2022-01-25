@@ -471,15 +471,18 @@ def dSig(pertId, pertMT, e, t):
 
     if   pertMT != '452':
 
-            XS = copy.deepcopy(nucData.xs)
-            XS[pertMT][e][t][pertId] = 1
-            XS['removal'][e][t][pertId] = 1
+        XS = copy.deepcopy(nucData.xs)
+        XS[pertMT][e][t][pertId] = 1
+        XS['removal'][e][t][pertId] = 1
+
+        if pertMT == '18':
+            XS['452'][e][t][pertId] = copy.deepcopy(sig['452'][e][t][pertId])
 
     elif pertMT == '452':
 
-            XS = copy.deepcopy(nucData.xs)
-            XS[pertMT][e][t][pertId] = 1
-            XS['18'][e][t][pertId] = copy.deepcopy(sig['18'][e][t][pertId])
+        XS = copy.deepcopy(nucData.xs)
+        XS[pertMT][e][t][pertId] = 1
+        XS['18'][e][t][pertId] = copy.deepcopy(sig['18'][e][t][pertId])
 
     return XS
 
@@ -527,7 +530,7 @@ def bateSig(Psi, Phi, pertMT, N, Ns, pertId, t, dt):
         RR = rr(XS,PSI,Phi,t)
         PL = updatePL(pl,RR)
 
-        R = Bateman(RR) - onixD(PL)
+        R = Bateman(RR) #- onixD(PL)
 
         BATE.append(I(Ns,N,R, dt))
 

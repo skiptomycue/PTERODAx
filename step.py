@@ -23,7 +23,7 @@ ND       = config.ND
 MT       = config.MT
 pert     = config.pert
 resetK   = config.resetK
-direct   = 0
+direct   = 1
 
 sens_formula = False
 ### INITS ###
@@ -278,6 +278,8 @@ def adjoStep(res, **kwargs):
     dir_2=np.zeros(len(res.comp[0])).tolist()
 
     S = np.zeros(ene).tolist()
+    s = np.zeros(ene).tolist()
+
     sens = []
 
     resp = kwargs['resp']
@@ -919,7 +921,7 @@ def adjoStep(res, **kwargs):
                 # adjoint power normalization
 
                 PL=fun.updatePL(fun.pl, rr)
-                R=fun.onixR(PL)
+                R = fun.Bateman(rr) - fun.onixD(PL)
                 Ps=fun.I([Ns1,SS],[No,N],R, dt)/P
 
                 adjoRes.pow.append(Ps)
@@ -966,6 +968,10 @@ def adjoStep(res, **kwargs):
                 # *sig['18'][e][v][PERTid]/RESP
 
                 S = [S[e] + (Bate_sig[e] + Beta_sig[e] + Pi_sig[e])*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
+
+                s = [s[e] + (Bate_sig[e] + Beta_sig[e] + Pi_sig[e])*(sig[xs_pert][e][v][PERTid]/RESP)**1 for e in range(ene)]
+
+                sens.append(s)
 
                 ind_1= [ind_1[e] + Beta_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
                 ind_2= [ind_2[e] + Pi_sig[e]*(sig[xs_pert][e][v][PERTid]/RESP)**0 for e in range(ene)]
