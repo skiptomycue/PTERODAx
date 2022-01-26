@@ -31,9 +31,29 @@ MXT=ST.MicroXSTuple
 
 ### TIME STEPS ###
 
-tempo_het  = np.linspace(0,5,10).tolist() + np.linspace(5,giorni/10,20).tolist()[1:] + np.linspace(giorni/10,giorni,50).tolist()[1:]
+def buildHet(PASSI):
+
+    pass1 = 5
+    pass2 = round(giorni*0.1)
+    pass3 = giorni - pass2
+    pass4 = giorni - pass1
+
+    het1 = round(PASSI*0.1)
+    het2 = round(PASSI*0.15)
+    het3 = PASSI -2*(het1+het2)
+
+    tempo_het  = np.linspace(0,pass1,het1).tolist() + np.linspace(pass1,pass2,het2).tolist()[1:] + np.linspace(pass2,pass3,het3).tolist()[1:] + np.linspace(pass3, pass4, het2).tolist()[1:] + np.linspace(pass4, giorni, het1).tolist()[1:]
+
+    return tempo_het
+
+tempo_het = buildHet(PASSI)
 tempo_homo = np.linspace(0, giorni, PASSI)
 tempo = tempo_het
+
+if config.hetSteps == False:
+
+    tempo = tempo_homo
+
 steps = len(tempo)
 nodo = min([int(len(dep.days)/2),int(len(tempo)/2)])
 

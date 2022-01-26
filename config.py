@@ -6,14 +6,22 @@ config.read("configfile.ini")
 sibyl  = config['sibyl']
 ptero  = config['pterodax']
 
-def bull(str):
-    return json.loads(str.lower())
+def bull(stri):
+
+    if stri == 'False' or stri == 'None' or stri == '0' or stri == 0:
+
+        return False
+
+    else:
+
+        return True
 
 ### MODEL INPUT ###
 
 model        =      sibyl['model']                                     # INPUT MODEL
 energy       =      sibyl['energy']                                    # INPUT ENERGY GROUPS
 PASSI        =  int(sibyl['passi'])                                    # INPUT STEP NUMBER
+hetSteps     = bull(sibyl['hetSteps'])
 fpSwitch     = bull(sibyl['fpswitch'])                                 # SWITCH TO FULL NUCLIDE CHART
 hetSwitch    = bull(sibyl['hetswitch'])                                # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
 
@@ -26,5 +34,6 @@ ND           =   bull(ptero['nd'])                                     # SWITCH 
 MT           =        ptero['mt']                                      # INPUT PERTURBATION XS
 pert         =  float(ptero['pert'])                                   # INPUT PERTURBATION %
 resetK       =   bull(ptero['resetk'])                                 # SWITCH K-RESET
+direct       =   bull(ptero['direct'])                                 # SWITCH K-RESET
 sens_formula =   bull(ptero['sens_formula'])
 

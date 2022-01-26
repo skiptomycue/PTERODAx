@@ -6,14 +6,14 @@ import numpy as np
 from periodictable import elements
 
 PERT = [('922350', '18'), ('922350', '452'), ('922350', '102'), ('922380', '18'), ('922380', '452'), ('922380', '102'), ('942390', '18'), ('942390', '452'), ('942390', '102')]
-PERT = [('922350', '18'), ('922350', '452'), ('922350', '102'), ('922380', '18'), ('922380', '452'), ('922380', '102')]
+#PERT = [('922350', '18'), ('922350', '452'), ('922350', '102'), ('922380', '18'), ('922380', '452'), ('922380', '102')]
 
 zailist  = ['922350', '922380', '942390', '80160', '10010']
 pertlist = ['tot', 'ela', 'sab', 'inl', '102', '18', '452', 'nxn']
 
 sens = ST.read('UO2/GPT/INP_sens0.m')
 SSK = sens.sensitivities['keff']
-with open('COVX/SENS.json') as fp:
+with open('COVX/SENS_het_bigrun.json') as fp:
     res_sens = json.load(fp)
 printKeys = False
 
@@ -86,7 +86,7 @@ def main(res_sens, PERT):
     print('\nUAM-benchmark keff uncertainties to ND:\n')
 
     tot = 0
-    pcm = 1000
+    pcm = 100
     udm = ' %'
 
     if resp == 'keff':
@@ -102,11 +102,12 @@ def main(res_sens, PERT):
 
         bun = res_sens[resp][zai][MT][0]
 
-        unc = tramezzino(bun[::-1], bun, covx) ** 0.5
+        unc = abs(tramezzino(bun[::-1], bun, covx)) ** 0.5
 
         tot += unc**2
 
-        print(getName(zai)+' MT='+MT+':\t'+str(int(unc*pcm))+udm)
+        print(unc)
+        print(getName(zai)+' MT='+MT+':\t'+str(unc*pcm)+udm)
 
         idZai = zailist.index(zai)
         idPert = pertlist.index(MT)

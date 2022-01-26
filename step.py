@@ -23,7 +23,7 @@ ND       = config.ND
 MT       = config.MT
 pert     = config.pert
 resetK   = config.resetK
-direct   = 1
+direct   = config.direct
 
 sens_formula = False
 ### INITS ###
@@ -1134,23 +1134,43 @@ def adjoStep(res, **kwargs):
 
     return adjoRes, sens
 
-def UncertBlock(sens):
+def resBlock(sens, name, run):
 
-    response = RESPONSE
-    perturb  = PERT[0]
+    if run == 'spesaSENS':
 
-    if RESPONSE == 'nuclide':
+        response = RESPONSE
+        perturb = PERT[0]
 
-        response = RESP_NUC
+        if RESPONSE == 'nuclide':
 
-    with open('COVX/SENS.json') as fp:
-        res_sens = json.load(fp)
+            response = RESP_NUC
 
-    R = copy.deepcopy(res_sens)
-    R[response][perturb][MT] = sens
+        with open(name+'.json') as fp:
+            res_sens = json.load(fp)
 
-    with open('COVX/SENS.json', 'w') as fp:
-        json.dump(R, fp)
+        R = copy.deepcopy(res_sens)
+        R[response][perturb][MT] = sens
+
+        with open(name+'.json', 'w') as fp:
+            json.dump(R, fp)
+
+    elif run == 'hetStudy':
+
+        with open(name+'.json') as fp:
+            res_sens = json.load(fp)
+
+        R = copy.deepcopy(res_sens)
+
+        if config.hetSteps == True:
+
+            R[str(nucData.PASSI)]['hetero'] = sens
+
+        elif config.hetSteps == False:
+
+            R[str(nucData.PASSI)]['homo'] = sens
+
+        with open(name+'.json', 'w') as fp:
+            json.dump(R, fp)
 
 ### PLOTS ###
 
@@ -1444,11 +1464,16 @@ def adjoPlot(res, adjoRes, **kwargs):
             X.append(name)
 
             e =(np.array(adjoRes.ind).transpose()[k][-1][0]*nn*c - sibyl[kk]*c) / sibyl[kk]/c * 100
+
+
             erro.append(abs(e))
             string = '%.1f' % abs(e) + '%'
             ax1.annotate(string, (0, y[0]*(1 - 0.05*np.sign(e))))
 
             j = j + 1
+
+            resBlock(abs(e), nucData.model+'/HET', run = 'hetStudy')
+
 
         ax1.legend(loc='best')
 
@@ -1639,7 +1664,7 @@ def bunSnap(resu, res, resp, name, xs, BOL):
     axs.legend(loc='best')
     axs.set_xlim(1E-9, 1E+2)
 
-    fig.savefig(model+'/'+resp+'_sensitivity_to_'+name+'_snap_'+BOL+'_'+xs+'.png')
+    fig.savefig(model+'/PLOTS/'+resp+'_sensitivity_to_'+name+'_snap_'+BOL+'_'+xs+'.png')
 
 ### MAIN ###
 
@@ -1668,28 +1693,26 @@ def main(**kwargs):
             fluxPlot(res.flux,  'Neutron Flux', 'n/cm'+square+'s', phi=res.phi, serp=nucData.Flux)
 
 
-    startD = 0
-    endD   = 0
-    startA = 0
-    endA   = 0
+    startD = datetime.now()
+    startA = datetime.now()
 
-    if kwargs['ptero'] != None:
+    if fun.bull(kwargs['ptero']) != False:
 
         ### perturbed solution ###
 
-        startD = datetime.now()
 
         pertBlock(res, ND=kwargs['ND'])
+
+        endD = datetime.now()
 
         ### adjoint solution ###
 
         resp = kwargs['ptero']
 
-        endD = datetime.now()
-
-        startA = datetime.now()
 
         if kwargs['ND'] == True :
+
+            startA = datetime.now()
 
             print('\n\nAdjoint calculation\n')
 
@@ -1698,11 +1721,16 @@ def main(**kwargs):
             bunSnap(adjoRes.ind[0], res, resp, PERT[0], reac, 'BOL')
             #bunSnap(adjoRes.ind[-2], res, PERT[-2], reac, 'EOL')
 
-            UncertBlock(sens)
+            endA = datetime.now()
+
+            resBlock(sens, 'COVX/SENS', run = 'spesaSENS')
+
 
 
 
         else:
+
+            startA = datetime.now()
 
             print('\n\nAdjoint calculation\n')
 
@@ -1710,7 +1738,8 @@ def main(**kwargs):
 
             adjoPlot(res, adjoRes, resp=resp)
 
-        endA = datetime.now()
+            endA = datetime.now()
+
 
         adjoPrint = False
         if adjoPrint == True:
@@ -1720,6 +1749,11 @@ def main(**kwargs):
             fluxPlot(flu.flux, 'Adjoint Flux', '')
             fluxPlot(flu.source, 'Adjoint Source', '')
             fluxPlot(flu.homo, 'Homogeneous adjoint Flux', '')
+
+    else:
+
+        endD = datetime.now()
+        endA = datetime.now()
 
     printTime(startD, endD, startA, endA)
 

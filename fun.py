@@ -9,6 +9,7 @@ from matplotlib.colors import LogNorm
 from periodictable import elements
 import copy
 import serpent
+import json
 
 ### NUCLEAR DATA ###
 
@@ -467,7 +468,7 @@ def dR2(Psi, Gh, N, k, t):
 
 ### ND ###
 
-def dSig(pertId, pertMT, e, t):
+def dSig(pertId, pertMT, e, t, **kwargs):
 
     if   pertMT != '452':
 
@@ -481,8 +482,11 @@ def dSig(pertId, pertMT, e, t):
     elif pertMT == '452':
 
         XS = copy.deepcopy(nucData.xs)
-        XS[pertMT][e][t][pertId] = 1
-        XS['18'][e][t][pertId] = copy.deepcopy(sig['18'][e][t][pertId])
+
+        if 'Bate' not in kwargs.keys():
+
+            XS[pertMT][e][t][pertId] = 1
+            XS['18'][e][t][pertId] = copy.deepcopy(sig['18'][e][t][pertId])
 
     return XS
 
@@ -525,7 +529,7 @@ def bateSig(Psi, Phi, pertMT, N, Ns, pertId, t, dt):
 
     for e in range(ene):
 
-        XS = dSig(pertId, pertMT, e, t)
+        XS = dSig(pertId, pertMT, e, t, Bate=True)
 
         RR = rr(XS,PSI,Phi,t)
         PL = updatePL(pl,RR)
@@ -729,3 +733,13 @@ def plotBU(A, name):
 
 
     return
+
+def bull(stri):
+
+    if stri == 'False' or stri == 'None' or stri == '0' or stri == 0:
+
+        return False
+
+    else:
+
+        return True
