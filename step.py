@@ -1164,6 +1164,18 @@ def resBlock(sens, name, run):
         with open(name+'.json', 'w') as fp:
             json.dump(R, fp)
 
+    elif run == 'evoSENS':
+
+        with open(name+'.json') as fp:
+            res_sens = json.load(fp)
+
+        R = copy.deepcopy(res_sens)
+        R[str(nucData.dayStop)][PERT[0]][MT] = sens[0]
+
+        with open(name+'.json', 'w') as fp:
+            json.dump(R, fp)
+
+
     elif run == 'hetStudy':
 
         with open(name+'.json') as fp:
@@ -1762,9 +1774,11 @@ def main(**kwargs):
 
             if run == 'spesa':
 
-                resBlock(sens, 'COVX/SENS', run = run)
+                resBlock(sens,  model+'/SENS', run = run)
 
+            if run == 'evoSENS':
 
+                resBlock(sens,  model+'/EVO_SENS', run = run)
 
 
         else:

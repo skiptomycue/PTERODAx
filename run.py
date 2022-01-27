@@ -13,23 +13,43 @@ plt.rcParams.update({'figure.figsize': (15, 10)})
 plt.rcParams.update({'figure.max_open_warning': 60})
 plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
 
+### UTILS ###
+
 def resDict(key1, key2, name):
 
     res_sens={}
 
     for a in key1:
-        res_sens[a]= {}
+        res_sens[str(a)]= {}
 
         for b in key2:
-            res_sens[a][b] = {}
+            res_sens[str(a)][b] = {}
 
 
     with open(name+'.json', 'w') as fp:
         json.dump(res_sens, fp)
 
+def getCovx(PERT):
+
+    z  = PERT[0][:-1]
+    MT = PERT[1]
+
+    with open('COVX/mtx.json') as fp:
+        cvx = json.load(fp)
+
+    mtx = cvx[z][MT]
+
+    return mtx
+
+def tramezzino(Ns,N,R):
+
+    return float(np.inner(np.array(Ns), np.array(R).dot(np.array(N))))
+
+### PIPELINES ###
+
 def spesaSENS(RESP, PERT, MT):
 
-    resDict(RESP, PERT, 'COVX/SENS')
+    resDict(RESP, PERT,  model+'/SENS')
 
     start = datetime.now()
 
@@ -121,32 +141,6 @@ def hetStudy(maglie, resp, pert):
 
             i += 1
 
-def plotHET(maglie, resp, pert):
-
-    with open(model+'/HET.json') as fp:
-        res_sens = json.load(fp)
-
-    hetero = np.array([res_sens[str(m)]['hetero'] for m in maglie])
-    homo = np.array([res_sens[str(m)]['homo'] for m in maglie])
-
-    x = maglie
-
-    x2 = np.array([nucData.giorni/m for m in maglie])
-
-    fig, ax1 = plt.subplots()
-
-    #ax1.set(xlabel='steps number', ylabel='error [%]', title = 'DPT convergence for '+resp+', perturbation: '+pert+' MT='+MT)
-    ax1.set(xlabel='average step length [days] ', ylabel='DPT error [%]', title = 'DPT convergence for '+resp+', perturbation: '+pert)
-
-    ax1.grid()
-
-    ax1.plot(x2, hetero, 'b', marker='o', label = 'hetero')
-    ax1.plot(x2, homo, 'r', marker='o', label = 'homo')
-
-    ax1.legend(loc='upper left')
-
-    fig.savefig(model + '/hetStudy.png')
-
 def evoPtero(giorni, resp, pert):
 
     start = datetime.now()
@@ -191,12 +185,66 @@ def evoPtero(giorni, resp, pert):
 
         i += 1
 
+def evoSENS(giorni, resp, pert, MT):
+
+    start = datetime.now()
+
+    resDict(giorni, pert, model+'/EVO_SENS')
+
+    config.set('sibyl', 'energy', '44')
+
+    config.set('pterodax', 'RESP_NUC', '942390')
+    config.set('pterodax', 'RESPONSE', resp)
+    config.set('pterodax', 'ND', 'True')
+    config.set('pterodax', 'direct', 'False')
+
+    i   = 0
+    tot = len(giorni)*len(pert)*len(MT)
+    EOL = nucData.time[-1]
+
+    for p in pert:
+
+        for m in MT:
+
+            for g in giorni:
+
+                print('\nCalculation ' + str(i + 1) + '/' + str(tot))
+
+                avgDT = 100
+                steps = round(EOL*g/avgDT)
+
+                config.set('sibyl', 'PASSI', str(steps))
+                config.set('sibyl', 'daystop', str(g))
+
+                config.set('pterodax', 'PERT_NUC', p)
+                config.set('pterodax', 'MT', m)
+
+                with open(r"configfile.ini", 'w') as configfile:
+                    config.write(configfile)
+
+                #os.system('python step.py > /dev/null')
+                os.system('python step.py')
+
+                end = datetime.now()
+                diff = end - start
+                chrono = divmod(diff.total_seconds(), 60)
+
+                print('Done!')
+                print('Running time: ' + str(int(chrono[0])) + ':' + '%02d' % (
+                    float(chrono[1]),) + ':%02d\t\t(min:sec:dec)\n' % (
+                          float(chrono[1]) * 100 % 100,))
+
+                i += 1
+
+
+### PLOTS ###
+
 def plotEVO(name, giorni, resp, pert, EOL):
 
     with open(model+'/'+name+'.json') as fp:
         res_sens = json.load(fp)
 
-    name = nucData.nuc[nucData.ZAI.index(pert)].name
+    pert_name = nucData.nuc[nucData.ZAI.index(pert)].name
 
     ptero = np.array([res_sens[str(m)]['ptero'] for m in giorni])
     sibyl = np.array([res_sens[str(m)]['sibyl'] for m in giorni])
@@ -206,7 +254,7 @@ def plotEVO(name, giorni, resp, pert, EOL):
     fig, ax1 = plt.subplots()
 
     #ax1.set(xlabel='steps number', ylabel='error [%]', title = 'DPT convergence for '+resp+', perturbation: '+pert+' MT='+MT)
-    ax1.set(xlabel='Calculation length [days] ', ylabel='Keff sensitivity', title = resp+' sensitivity to '+name+' concentration')
+    ax1.set(xlabel='Calculation length [days] ', ylabel='Keff sensitivity', title = resp+' sensitivity to '+pert_name+' concentration')
 
     ax1.grid()
 
@@ -218,6 +266,96 @@ def plotEVO(name, giorni, resp, pert, EOL):
     ax1.legend(loc='upper left')
 
     fig.savefig(model + '/evoPtero.png')
+
+def plotHET(maglie, resp, pert):
+
+    with open(model+'/HET.json') as fp:
+        res_sens = json.load(fp)
+
+    hetero = np.array([res_sens[str(m)]['hetero'] for m in maglie])
+    homo = np.array([res_sens[str(m)]['homo'] for m in maglie])
+
+    x = maglie
+
+    x2 = np.array([nucData.giorni/m for m in maglie])
+
+    fig, ax1 = plt.subplots()
+
+    #ax1.set(xlabel='steps number', ylabel='error [%]', title = 'DPT convergence for '+resp+', perturbation: '+pert+' MT='+MT)
+    ax1.set(xlabel='average step length [days] ', ylabel='DPT error [%]', title = 'DPT convergence for '+resp+', perturbation: '+pert)
+
+    ax1.grid()
+
+    ax1.plot(x2, hetero, 'b', marker='o', label = 'hetero')
+    ax1.plot(x2, homo, 'r', marker='o', label = 'homo')
+
+    ax1.legend(loc='upper left')
+
+    fig.savefig(model + '/hetStudy.png')
+
+def plotUNC(name, giorni, EOL, PERT, MT):
+
+    with open(model+'/'+name+'.json') as fp:
+        res_sens = json.load(fp)
+
+    pcm = 1E+5
+
+    TOT = []
+    U8  = []
+    Pu  = []
+
+    for g in giorni:
+
+        tot = 0
+        u8  = 0
+        pu  = 0
+
+        for p in PERT:
+
+            for m in MT:
+
+                bun = res_sens[str(g)][p][m]
+
+                mtx = getCovx([p,m])
+
+                unc = abs(tramezzino(bun[::-1], bun, mtx)) ** 0.5
+
+                tot += unc ** 2
+
+                if [p.m] == ['922380', '102']:
+
+                    u8 += unc ** 2
+
+                if  [p.m] == ['942390', '452']:
+
+                    pu += unc ** 2
+
+
+        TOT.append(tot**0.5*pcm)
+        U8.append(u8)
+        Pu.append(pu)
+
+
+    x = np.array(giorni) * EOL
+
+    fig, ax1 = plt.subplots()
+
+    ax1.set(xlabel='Calculation length [days] ', ylabel='Uncertainty (pcm)', title='keff uncertainty evolution')
+
+    ax1.grid()
+
+    ax1.plot(x, TOT, 'b', marker='o', label='TOTAL')
+    ax1.plot(x, U8, 'm', marker='o', label='U-238 capture')
+    ax1.plot(x, Pu, 'brown', marker='o', label='Pu-239 nubar')
+
+    ax1.ticklabel_format(useOffset=False, style='plain')
+
+    ax1.legend(loc='upper left')
+
+    fig.savefig(model + '/evoUNC.png')
+
+
+
 
 
 
@@ -269,4 +407,22 @@ def main(run):
         #evoPtero(giorni, 'keff', '942390')
         plotEVO('EVO_U8', giorni, 'keff', '922380', EOL)
 
-main('evoPtero')
+    elif run == 'evoSENS':
+
+        EOL = nucData.time[-1]
+
+        PERT = ['922350', '922380', '942390']
+        MT = ['18', '102', '452']
+
+        PERT = ['922380', '942390']
+        MT = ['102', '452']
+
+        EOL = nucData.time[-1]
+        config.set('pterodax', 'run', run)
+        giorni = [0.2, 0.4, 0.6, 0.8, 1.0]
+        giorni = [0.4, 1.0]
+
+        evoSENS(giorni, 'keff', PERT, MT)
+        plotUNC('EVO_SENS', giorni, EOL, PERT, MT)
+
+main('evoSENS')
