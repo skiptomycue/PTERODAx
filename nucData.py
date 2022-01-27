@@ -645,3 +645,4 @@ endNuc = datetime.now()
 
 nuc[ZAI.index('922350')].name = 'Uranium-235'
 nuc[ZAI.index('922380')].name = 'Uranium-238'
+nuc[ZAI.index('942390')].name = 'Plutonium-239'

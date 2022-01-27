@@ -222,7 +222,14 @@ def pertBlock(res, **kwargs):
             Bdir = zeroAt[pertId]
             Bper = zeroAt[pertId] * pert
 
+            if zeroAt[pertId] == 0:
+
+                Bper = zeroAt[ZAI.index('922380')]*0.001
+
             zeroAt[pertId] = Bper
+
+
+
 
             pertRes = directStep(zeroAt, sig)
 
@@ -1220,6 +1227,11 @@ def printTime(sd, ed, sa, ea):
 
     print('')
 
+    sys.exit(0)
+    raise SystemExit
+
+    return
+
 def massPlot(res):
 
     dep = ST.read(nucData.file+'/'+nucData.input+'_dep.m')
@@ -1450,7 +1462,7 @@ def adjoPlot(res, adjoRes, **kwargs):
 
         if nn == 0:
 
-            nn = res.comp[-1][k]*0.01
+            nn = zeroAt[ZAI.index('922380')]*0.001
 
         fig, ax1 = plt.subplots()
         ax1.grid()
@@ -1496,8 +1508,6 @@ def adjoPlot(res, adjoRes, **kwargs):
 
                 Ptero = np.array(adjoRes.ind).transpose()[k][-1][0]*nn*c
                 Sibyl = sibyl[kk] * c
-
-                print([Ptero, Sibyl])
 
                 resBlock([Ptero, Sibyl], nucData.model+'/EVO', run = run)
 
@@ -1792,6 +1802,8 @@ main(ptero=RESPONSE, ND=ND)
 
 ### chrono ###
 
+os.kill(os.getpid())
+sys.exit()
 sys.exit(0)
 raise SystemExit
 

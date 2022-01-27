@@ -168,7 +168,8 @@ def evoPtero(giorni, resp, pert):
 
         print('\nCalculation ' + str(i + 1) + '/' + str(tot))
 
-        steps = round(EOL*m/25)
+        avgDT = 15
+        steps = round(EOL*m/avgDT)
 
         config.set('sibyl', 'PASSI', str(steps))
         config.set('sibyl', 'daystop', str(m))
@@ -190,10 +191,12 @@ def evoPtero(giorni, resp, pert):
 
         i += 1
 
-def plotEVO(giorni, resp, pert, EOL):
+def plotEVO(name, giorni, resp, pert, EOL):
 
-    with open(model+'/EVO.json') as fp:
+    with open(model+'/'+name+'.json') as fp:
         res_sens = json.load(fp)
+
+    name = nucData.nuc[nucData.ZAI.index(pert)].name
 
     ptero = np.array([res_sens[str(m)]['ptero'] for m in giorni])
     sibyl = np.array([res_sens[str(m)]['sibyl'] for m in giorni])
@@ -203,7 +206,7 @@ def plotEVO(giorni, resp, pert, EOL):
     fig, ax1 = plt.subplots()
 
     #ax1.set(xlabel='steps number', ylabel='error [%]', title = 'DPT convergence for '+resp+', perturbation: '+pert+' MT='+MT)
-    ax1.set(xlabel='Calculation length [days] ', ylabel='Keff sensitivity', title = resp+' sensitivity to '+pert+' concentration')
+    ax1.set(xlabel='Calculation length [days] ', ylabel='Keff sensitivity', title = resp+' sensitivity to '+name+' concentration')
 
     ax1.grid()
 
@@ -263,7 +266,7 @@ def main(run):
         EOL = nucData.time[-1]
         config.set('pterodax', 'run', run)
         giorni = [0.2, 0.4, 0.6, 0.8, 1.0]
-        evoPtero(giorni, 'keff', '942390')
-        plotEVO(giorni, 'keff', '942390', EOL)
+        #evoPtero(giorni, 'keff', '942390')
+        plotEVO('EVO_U8', giorni, 'keff', '922380', EOL)
 
 main('evoPtero')
