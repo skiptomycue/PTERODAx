@@ -322,18 +322,18 @@ def plotUNC(name, giorni, EOL, PERT, MT):
 
                 tot += unc ** 2
 
-                if [p.m] == ['922380', '102']:
+                if [p,m] == ['922380', '102']:
 
                     u8 += unc ** 2
 
-                if  [p.m] == ['942390', '452']:
+                if  [p,m] == ['942390', '452']:
 
                     pu += unc ** 2
 
 
         TOT.append(tot**0.5*pcm)
-        U8.append(u8)
-        Pu.append(pu)
+        U8.append(u8**0.5*pcm)
+        Pu.append(pu**0.5*pcm)
 
 
     x = np.array(giorni) * EOL
@@ -422,7 +422,7 @@ def main(run):
         giorni = [0.2, 0.4, 0.6, 0.8, 1.0]
         giorni = [0.4, 1.0]
 
-        evoSENS(giorni, 'keff', PERT, MT)
+        #evoSENS(giorni, 'keff', PERT, MT)
         plotUNC('EVO_SENS', giorni, EOL, PERT, MT)
 
 main('evoSENS')
