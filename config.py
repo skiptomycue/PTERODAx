@@ -21,6 +21,7 @@ def bull(stri):
 model        =      sibyl['model']                                     # INPUT MODEL
 energy       =      sibyl['energy']                                    # INPUT ENERGY GROUPS
 PASSI        =  int(sibyl['passi'])                                    # INPUT STEP NUMBER
+dayStop      =  float(sibyl['daystop'])                                  # INPUT STEP NUMBER
 hetSteps     = bull(sibyl['hetSteps'])
 fpSwitch     = bull(sibyl['fpswitch'])                                 # SWITCH TO FULL NUCLIDE CHART
 hetSwitch    = bull(sibyl['hetswitch'])                                # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
@@ -32,6 +33,7 @@ RESP_NUC     =        ptero['resp_nuc']                                # OUTPUT 
 RESPONSE     =        ptero['response']                                # OUTPUT NUCLIDE, KEFF OR NONE
 ND           =   bull(ptero['nd'])                                     # SWITCH ND PERTURBATION
 MT           =        ptero['mt']                                      # INPUT PERTURBATION XS
+run           =        ptero['run']                                      # INPUT PERTURBATION XS
 pert         =  float(ptero['pert'])                                   # INPUT PERTURBATION %
 resetK       =   bull(ptero['resetk'])                                 # SWITCH K-RESET
 direct       =   bull(ptero['direct'])                                 # SWITCH K-RESET

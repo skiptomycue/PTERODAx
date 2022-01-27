@@ -60,7 +60,7 @@ def fluxSnap(flux, name, UM, **kwargs):
     axs.legend(loc='upper right')
     axs.set_xlim(1E-9, 1E+2)
 
-    fig.savefig('COVX/sens_comparison_'+name[0]+' MT='+name[1]+'.png')
+    fig.savefig('COVX/PLOT/sens_comparison_'+name[0]+' MT='+name[1]+'.png')
 def getName(zai):
 
     z=zai[:-4]

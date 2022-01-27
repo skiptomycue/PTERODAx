@@ -24,6 +24,8 @@ MT       = config.MT
 pert     = config.pert
 resetK   = config.resetK
 direct   = config.direct
+run      = config.run
+
 
 sens_formula = False
 ### INITS ###
@@ -48,7 +50,8 @@ reg = 3
 
 plt.rcParams.update({'font.size': 22})
 plt.rcParams.update({'lines.linewidth': 4})
-plt.rcParams.update({'figure.figsize': (15, 10)})
+plt.rcParams['lines.markersize'] = 10
+plt.rcParams.update({'figure.figsize': (18, 10)})
 plt.rcParams.update({'figure.max_open_warning': 60})
 plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
 
@@ -1136,7 +1139,7 @@ def adjoStep(res, **kwargs):
 
 def resBlock(sens, name, run):
 
-    if run == 'spesaSENS':
+    if run == 'spesa':
 
         response = RESPONSE
         perturb = PERT[0]
@@ -1170,6 +1173,19 @@ def resBlock(sens, name, run):
             R[str(nucData.PASSI)]['homo'] = sens
 
         with open(name+'.json', 'w') as fp:
+            json.dump(R, fp)
+
+    elif run == 'evoPtero':
+
+        with open(name + '.json') as fp:
+            res_sens = json.load(fp)
+
+        R = copy.deepcopy(res_sens)
+
+        R[str(nucData.dayStop)]['ptero'] = sens[0]
+        R[str(nucData.dayStop)]['sibyl'] = sens[1]
+
+        with open(name + '.json', 'w') as fp:
             json.dump(R, fp)
 
 ### PLOTS ###
@@ -1472,7 +1488,18 @@ def adjoPlot(res, adjoRes, **kwargs):
 
             j = j + 1
 
-            resBlock(abs(e), nucData.model+'/HET', run = 'hetStudy')
+            if run == 'hetero':
+
+                resBlock(abs(e), nucData.model+'/HET', run = run)
+
+            if run == 'evoPtero':
+
+                Ptero = np.array(adjoRes.ind).transpose()[k][-1][0]*nn*c
+                Sibyl = sibyl[kk] * c
+
+                print([Ptero, Sibyl])
+
+                resBlock([Ptero, Sibyl], nucData.model+'/EVO', run = run)
 
 
         ax1.legend(loc='best')
@@ -1723,7 +1750,9 @@ def main(**kwargs):
 
             endA = datetime.now()
 
-            resBlock(sens, 'COVX/SENS', run = 'spesaSENS')
+            if run == 'spesa':
+
+                resBlock(sens, 'COVX/SENS', run = run)
 
 
 
@@ -1757,6 +1786,7 @@ def main(**kwargs):
 
     printTime(startD, endD, startA, endA)
 
+    return
 
 main(ptero=RESPONSE, ND=ND)
 

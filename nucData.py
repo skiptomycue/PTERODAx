@@ -13,6 +13,7 @@ startNuc = datetime.now()
 
 model     = config.model                                    # INPUT MODEL
 energy    = config.energy                                      # INPUT ENERGY GROUPS
+dayStop   = config.dayStop
 PASSI     = config.PASSI                                       # INPUT STEP NUMBER
 fpSwitch  = config.fpSwitch                                        # SWITCH TO FULL NUCLIDE CHART
 hetSwitch = config.hetSwitch                                        # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
@@ -25,7 +26,7 @@ res = ST.read(file + '/'+input+'_res.m')
 dep = ST.read(file + '/'+input+'_dep.m')
 keff = ST.read(file+'/'+input+'_res.m').resdata['absKeff'][:,0]
 time =  dep.days
-giorni = dep.days[-1]
+giorni = dep.days[-1]*dayStop
 T = dep.days[-1]*24*3600
 MXT=ST.MicroXSTuple
 
