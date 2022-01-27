@@ -210,7 +210,7 @@ def evoSENS(giorni, resp, pert, MT):
 
                 print('\nCalculation ' + str(i + 1) + '/' + str(tot))
 
-                avgDT = 100
+                avgDT = 25
                 steps = round(EOL*g/avgDT)
 
                 config.set('sibyl', 'PASSI', str(steps))
@@ -414,13 +414,10 @@ def main(run):
         PERT = ['922350', '922380', '942390']
         MT = ['18', '102', '452']
 
-        PERT = ['922380', '942390']
-        MT = ['102', '452']
 
         EOL = nucData.time[-1]
         config.set('pterodax', 'run', run)
         giorni = [0.2, 0.4, 0.6, 0.8, 1.0]
-        giorni = [0.4, 1.0]
 
         #evoSENS(giorni, 'keff', PERT, MT)
         plotUNC('EVO_SENS', giorni, EOL, PERT, MT)
