@@ -72,8 +72,8 @@ def spesaSENS(RESP, PERT, MT):
                     resp = 'keff'
                     s    = '942390'
 
-                config.set('sibyl', 'energy', '44')
-                config.set('sibyl', 'PASSI', '125')
+                config.set('sibyl', 'energy', '2')
+                config.set('sibyl', 'PASSI', '25')
                 config.set('sibyl', 'hetSteps', 'True')
 
                 config.set('pterodax', 'direct', 'True')
@@ -85,7 +85,10 @@ def spesaSENS(RESP, PERT, MT):
                 with open(r"configfile.ini", 'w') as configfile:
                     config.write(configfile)
 
-                os.system('python step.py > /dev/null')
+                #os.system('python step.py > /dev/null')
+                os.system('python step.py ')
+
+
 
                 end = datetime.now()
                 diff = end - start
@@ -191,7 +194,7 @@ def evoSENS(giorni, resp, pert, MT):
 
     resDict(giorni, pert, model+'/EVO_SENS')
 
-    config.set('sibyl', 'energy', '44')
+    config.set('sibyl', 'energy', '2')
 
     config.set('pterodax', 'RESP_NUC', '942390')
     config.set('pterodax', 'RESPONSE', resp)
@@ -370,6 +373,7 @@ config.set('sibyl', 'energy', '2')
 config.set('sibyl', 'hetSteps', 'True')
 config.set('sibyl', 'fpSwitch', 'False')
 config.set('sibyl', 'hetSwitch', 'False')
+config.set('sibyl', 'daystop', '1.0')
 
 config.add_section('pterodax')
 
@@ -388,7 +392,7 @@ def main(run):
         config.set('pterodax', 'run', run)
         RESP = ['keff', '942390', '922350']
         PERT = ['922350', '922380', '942390']
-        MT = ['18', '102', '452']
+        MT = ['452']
 
         spesaSENS(RESP, PERT, MT)
 
@@ -414,12 +418,17 @@ def main(run):
         PERT = ['922350', '922380', '942390']
         MT = ['18', '102', '452']
 
+        #PERT = ['922380']
+        #MT = ['102']
 
         EOL = nucData.time[-1]
         config.set('pterodax', 'run', run)
         giorni = [0.2, 0.4, 0.6, 0.8, 1.0]
 
-        #evoSENS(giorni, 'keff', PERT, MT)
+        giorni = [0.4, 1.0]
+
+
+        evoSENS(giorni, 'keff', PERT, MT)
         plotUNC('EVO_SENS', giorni, EOL, PERT, MT)
 
-main('evoSENS')
+main('spesa')

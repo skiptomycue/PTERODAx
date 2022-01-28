@@ -482,10 +482,10 @@ def dSig(pertId, pertMT, e, t, **kwargs):
     elif pertMT == '452':
 
         XS = copy.deepcopy(nucData.xs)
+        XS[pertMT][e][t][pertId] = 1
 
         if 'Bate' not in kwargs.keys():
 
-            XS[pertMT][e][t][pertId] = 1
             XS['18'][e][t][pertId] = copy.deepcopy(sig['18'][e][t][pertId])
 
     return XS
@@ -527,6 +527,10 @@ def bateSig(Psi, Phi, pertMT, N, Ns, pertId, t, dt):
     BATE = []
     PSI = reshapePsi(Psi)
 
+    if pertMT == '452':
+
+        return np.zeros(ene)
+
     for e in range(ene):
 
         XS = dSig(pertId, pertMT, e, t, Bate=True)
@@ -536,7 +540,9 @@ def bateSig(Psi, Phi, pertMT, N, Ns, pertId, t, dt):
 
         R = Bateman(RR) #- onixD(PL)
 
-        BATE.append(I(Ns,N,R, dt))
+        B = I(Ns,N,R, dt)
+
+        BATE.append(B)
 
     return np.array(BATE)
 

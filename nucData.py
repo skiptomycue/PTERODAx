@@ -56,7 +56,9 @@ if config.hetSteps == False:
     tempo = tempo_homo
 
 steps = len(tempo)
-nodo = min([int(len(dep.days)/2),int(len(tempo)/2)])
+#nodo = min([int(len(dep.days)/2),int(len(tempo)/2)])
+nodo = 5
+
 
 ### SERPENT ###
 

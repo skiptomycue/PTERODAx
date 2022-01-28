@@ -269,6 +269,8 @@ def pertBlock(res, **kwargs):
 
             j = j + 1
 
+    return
+
 def adjoStep(res, **kwargs):
 
     adjoRes = fun.Results()
@@ -1207,6 +1209,8 @@ def resBlock(sens, name, run):
         with open(name + '.json', 'w') as fp:
             json.dump(R, fp)
 
+    return
+
 ### PLOTS ###
 
 def printTime(sd, ed, sa, ea):
@@ -1239,7 +1243,7 @@ def printTime(sd, ed, sa, ea):
 
     print('')
 
-    sys.exit(0)
+    sys.exit()
     raise SystemExit
 
     return
@@ -1327,6 +1331,8 @@ def massPlot(res):
 
         fig.savefig(model+'/masse/'+ nucData.nuc[k].name + '.png')
 
+    return
+
 def printRes(res, **kwargs):
 
     print('\n\nResults')
@@ -1354,34 +1360,7 @@ def printRes(res, **kwargs):
                 print(getattr(res, key)[0][0])
                 print(getattr(res, key)[-1][-1])
 
-        def pertBlock():
-
-            j = 0
-
-            res.pert['atoms'] = []
-            res.pert['keff'] = []
-
-            for z in PERT:
-                zeroAt = nucData.At.copy()
-
-                pertId = nucData.ZAI.index(z)
-
-                print('\n\nPerturbed calculation ' + str(j + 1) + ' (' + nucData.ZAI[pertId] + ')\n')
-
-                Bdir = zeroAt[pertId]
-                Bper = zeroAt[pertId] * pert
-
-                zeroAt[pertId] = Bper
-
-                pertRes = directStep(zeroAt)
-
-                Npert = pertRes.comp[-1]
-                No = res.comp[-1]
-                res.pert['atoms'].append(Npert[respId] - No[respId])
-                res.pert['keff'].append((pertRes.keff[-1] - res.keff[-1]))
-
-                j = j + 1
-                # printRes(pertRes, keff=True, comp = False, phi = False, flux = False)
+    return
 
 def paraPlot(para, name, **kwargs):
 
@@ -1424,6 +1403,8 @@ def paraPlot(para, name, **kwargs):
     ax1.legend(loc='upper right')
 
     fig.savefig(model + '/' + name + '.png')
+
+    return
 
 def adjoPlot(res, adjoRes, **kwargs):
 
@@ -1573,6 +1554,8 @@ def adjoPlot(res, adjoRes, **kwargs):
 
     fig3.savefig(model+'/adjohisto_'+resp)
 
+    return
+
 def fluxPlot(flux, name, UM, **kwargs):
 
     if 'phi' in kwargs.keys():
@@ -1621,6 +1604,8 @@ def fluxPlot(flux, name, UM, **kwargs):
 
     fig.savefig(model+'/flux/' + name + '.png')
 
+    return
+
 def fluxSnap(flux, name, UM, **kwargs):
 
     if 'phi' in kwargs.keys():
@@ -1654,6 +1639,8 @@ def fluxSnap(flux, name, UM, **kwargs):
     axs.set_xlim(1E-9, 1E+2)
 
     fig.savefig(model+'/flux/' + name + '_snap.png')
+
+    return
 
 def bunSnap(resu, res, resp, name, xs, BOL):
 
@@ -1714,6 +1701,8 @@ def bunSnap(resu, res, resp, name, xs, BOL):
     axs.set_xlim(1E-9, 1E+2)
 
     fig.savefig(model+'/PLOTS/'+resp+'_sensitivity_to_'+name+'_snap_'+BOL+'_'+xs+'.png')
+
+    return
 
 ### MAIN ###
 
