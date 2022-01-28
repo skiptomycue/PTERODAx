@@ -32,7 +32,7 @@ MXT=ST.MicroXSTuple
 
 ### TIME STEPS ###
 
-def buildHet(PASSI):
+def buildTempo(PASSI, half):
 
     pass1 = 5
     pass2 = round(giorni*0.1)
@@ -43,17 +43,27 @@ def buildHet(PASSI):
     het2 = round(PASSI*0.15)
     het3 = PASSI -2*(het1+het2)
 
-    tempo_het  = np.linspace(0,pass1,het1).tolist() + np.linspace(pass1,pass2,het2).tolist()[1:] + np.linspace(pass2,pass3,het3).tolist()[1:] + np.linspace(pass3, pass4, het2).tolist()[1:] + np.linspace(pass4, giorni, het1).tolist()[1:]
+    if half == '2':
 
-    return tempo_het
+        tempo  = np.linspace(0,pass1,het1).tolist() + np.linspace(pass1,pass2,het2).tolist()[1:] + np.linspace(pass2,pass3,het3).tolist()[1:] + np.linspace(pass3, pass4, het2).tolist()[1:] + np.linspace(pass4, giorni, het1).tolist()[1:]
 
-tempo_het = buildHet(PASSI)
-tempo_homo = np.linspace(0, giorni, PASSI)
-tempo = tempo_het
+    elif half == '1':
 
-if config.hetSteps == False:
+        het3 = PASSI - (het1+het2)
+        tempo = np.linspace(0, pass1, het1).tolist() + np.linspace(pass1, pass2, het2).tolist()[1:] + np.linspace(pass2, giorni, het3).tolist()[1:]
 
-    tempo = tempo_homo
+
+    elif half == '0':
+
+        tempo = np.linspace(0, giorni, PASSI)
+
+    else:
+
+        print('errore in hetStep')
+
+    return tempo
+
+tempo = buildTempo(PASSI, config.hetSteps)
 
 steps = len(tempo)
 #nodo = min([int(len(dep.days)/2),int(len(tempo)/2)])

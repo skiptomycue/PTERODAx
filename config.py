@@ -18,13 +18,13 @@ def bull(stri):
 
 ### MODEL INPUT ###
 
-model        =      sibyl['model']                                     # INPUT MODEL
-energy       =      sibyl['energy']                                    # INPUT ENERGY GROUPS
-PASSI        =  int(sibyl['passi'])                                    # INPUT STEP NUMBER
+model        =        sibyl['model']                                     # INPUT MODEL
+energy       =        sibyl['energy']                                    # INPUT ENERGY GROUPS
+PASSI        =    int(sibyl['passi'])                                    # INPUT STEP NUMBER
 dayStop      =  float(sibyl['daystop'])                                  # INPUT STEP NUMBER
-hetSteps     = bull(sibyl['hetSteps'])
-fpSwitch     = bull(sibyl['fpswitch'])                                 # SWITCH TO FULL NUCLIDE CHART
-hetSwitch    = bull(sibyl['hetswitch'])                                # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
+hetSteps     =        sibyl['hetSteps']
+fpSwitch     =   bull(sibyl['fpswitch'])                                 # SWITCH TO FULL NUCLIDE CHART
+hetSwitch    =   bull(sibyl['hetswitch'])                                # SWITCH TO HETEROGENEOUS CORRECTION FOR FUEL AND NICHEL
 
 ### SENSITIVITY INPUT ###
 

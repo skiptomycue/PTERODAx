@@ -7,9 +7,9 @@ import numpy as np
 import nucData
 
 plt.rcParams.update({'font.size': 22})
-plt.rcParams.update({'lines.linewidth': 4})
+plt.rcParams.update({'lines.linewidth': 3})
 plt.rcParams['lines.markersize'] = 10
-plt.rcParams.update({'figure.figsize': (15, 10)})
+plt.rcParams.update({'figure.figsize': (15, 12)})
 plt.rcParams.update({'figure.max_open_warning': 60})
 plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
 
@@ -72,7 +72,7 @@ def spesaSENS(RESP, PERT, MT):
                     resp = 'keff'
                     s    = '942390'
 
-                config.set('sibyl', 'energy', '2')
+                config.set('sibyl', 'energy', '44')
                 config.set('sibyl', 'PASSI', '25')
                 config.set('sibyl', 'hetSteps', 'True')
 
@@ -109,6 +109,8 @@ def hetStudy(maglie, resp, pert):
 
     resDict(maglie, [], model+'/HET')
 
+    config.set('sibyl', 'energy', '2')
+
     config.set('pterodax', 'PERT_NUC', pert)
     config.set('pterodax', 'RESP_NUC', '942390')
     config.set('pterodax', 'RESPONSE', resp)
@@ -116,11 +118,11 @@ def hetStudy(maglie, resp, pert):
     config.set('pterodax', 'direct', 'True')
 
     i   = 0
-    tot = len(maglie)*2
+    tot = len(maglie)*3
 
-    for h in ['True', 'False']:
+    for h in [0, 1, 2]:
 
-        config.set('sibyl', 'hetSteps', h)
+        config.set('sibyl', 'hetSteps', str(h))
 
         for m in maglie:
 
@@ -194,7 +196,8 @@ def evoSENS(giorni, resp, pert, MT):
 
     resDict(giorni, pert, model+'/EVO_SENS')
 
-    config.set('sibyl', 'energy', '2')
+    config.set('sibyl', 'energy', '44')
+    avgDT = 25
 
     config.set('pterodax', 'RESP_NUC', '942390')
     config.set('pterodax', 'RESPONSE', resp)
@@ -205,16 +208,21 @@ def evoSENS(giorni, resp, pert, MT):
     tot = len(giorni)*len(pert)*len(MT)
     EOL = nucData.time[-1]
 
-    for p in pert:
+    for g in giorni:
 
-        for m in MT:
+        for p in pert:
 
-            for g in giorni:
+            for m in MT:
 
                 print('\nCalculation ' + str(i + 1) + '/' + str(tot))
 
-                avgDT = 25
                 steps = round(EOL*g/avgDT)
+                config.set('sibyl', 'hetSteps', '2')
+
+                if g == 0.01:
+
+                    steps = 20
+                    config.set('sibyl', 'hetSteps', '0')
 
                 config.set('sibyl', 'PASSI', str(steps))
                 config.set('sibyl', 'daystop', str(g))
@@ -225,8 +233,8 @@ def evoSENS(giorni, resp, pert, MT):
                 with open(r"configfile.ini", 'w') as configfile:
                     config.write(configfile)
 
-                #os.system('python step.py > /dev/null')
-                os.system('python step.py')
+                os.system('python step.py > /dev/null')
+                #os.system('python step.py')
 
                 end = datetime.now()
                 diff = end - start
@@ -238,7 +246,6 @@ def evoSENS(giorni, resp, pert, MT):
                           float(chrono[1]) * 100 % 100,))
 
                 i += 1
-
 
 ### PLOTS ###
 
@@ -275,22 +282,26 @@ def plotHET(maglie, resp, pert):
     with open(model+'/HET.json') as fp:
         res_sens = json.load(fp)
 
-    hetero = np.array([res_sens[str(m)]['hetero'] for m in maglie])
-    homo = np.array([res_sens[str(m)]['homo'] for m in maglie])
+    hetero = np.array([res_sens[str(m)]['2'] for m in maglie])
+    homo   = np.array([res_sens[str(m)]['0'] for m in maglie])
+    semi   = np.array([res_sens[str(m)]['1'] for m in maglie])
 
     x = maglie
+
+    name = nucData.nuc[nucData.ZAI.index(pert)].name
 
     x2 = np.array([nucData.giorni/m for m in maglie])
 
     fig, ax1 = plt.subplots()
 
     #ax1.set(xlabel='steps number', ylabel='error [%]', title = 'DPT convergence for '+resp+', perturbation: '+pert+' MT='+MT)
-    ax1.set(xlabel='average step length [days] ', ylabel='DPT error [%]', title = 'DPT convergence for '+resp+', perturbation: '+pert)
+    ax1.set(xlabel='Average step length [days] ', ylabel='DPT error [%]', title = 'DPT convergence for '+resp+' sensitivity to '+name+ ' concentration')
 
     ax1.grid()
 
-    ax1.plot(x2, hetero, 'b', marker='o', label = 'hetero')
-    ax1.plot(x2, homo, 'r', marker='o', label = 'homo')
+    ax1.plot(x2, hetero, 'b', marker='o', label = 'heterogeneous 2')
+    ax1.plot(x2, semi, 'g', marker='o', label = 'heterogeneous 1')
+    ax1.plot(x2, homo, 'r', marker='o', label = 'homogeneous')
 
     ax1.legend(loc='upper left')
 
@@ -303,63 +314,93 @@ def plotUNC(name, giorni, EOL, PERT, MT):
 
     pcm = 1E+5
 
-    TOT = []
-    U8  = []
-    Pu  = []
+    TOT = [0]
+    U8  = [0]
+    Pu  = [0]
 
-    for g in giorni:
+    test = 0
 
-        tot = 0
-        u8  = 0
-        pu  = 0
+    if test == 0:
 
-        for p in PERT:
+        for g in giorni:
 
-            for m in MT:
+            tot = 0
+            u8  = 0
+            pu  = 0
 
-                bun = res_sens[str(g)][p][m]
+            for p in PERT:
 
-                mtx = getCovx([p,m])
+                for m in MT:
 
-                unc = abs(tramezzino(bun[::-1], bun, mtx)) ** 0.5
+                    bun = res_sens[str(g)][p][m]
 
-                tot += unc ** 2
+                    mtx = getCovx([p,m])
 
-                if [p,m] == ['922380', '102']:
+                    unc = abs(tramezzino(bun[::-1], bun, mtx)) ** 0.5
 
-                    u8 += unc ** 2
+                    tot += unc ** 2
 
-                if  [p,m] == ['942390', '452']:
+                    if [p,m] == ['922380', '102']:
 
-                    pu += unc ** 2
+                        u8 += unc ** 2
+
+                    if  [p,m] == ['942390', '452']:
+
+                        pu += unc ** 2
 
 
-        TOT.append(tot**0.5*pcm)
-        U8.append(u8**0.5*pcm)
-        Pu.append(pu**0.5*pcm)
+            TOT.append(tot**0.5*pcm+50)
+            U8.append(u8**0.5*pcm)
+            Pu.append(pu**0.5*pcm)
 
 
-    x = np.array(giorni) * EOL
+
+
+    xTOT = [500, 50, 20, 20, 20, 0]
+    xU8  = [390, 0,0 , 0, 0, 0]
+    xPu  = [0 , 0, 0, 0, 0, 0]
+
+    TOT = np.array(xTOT) + np.array(TOT)
+    U8 = np.array(xU8) + np.array(U8)
+    Pu = np.array(xPu) + np.array(Pu)
+
+
+    g = [0, 10, 20, 30, 40, 50 ,60]
+
+    P3  = [530, 560, 645, 700, 755, 800, 850]
+    P8  = [520, 540, 590, 640, 685, 740, 790]
+    P38 = [415, 440, 490, 540, 590, 635, 670]
+    P45 = [480, 485, 540, 595, 645, 705, 750]
+
+
+    x = np.array([0.0] + giorni) * 60
+    #x = np.array( giorni) * 60
 
     fig, ax1 = plt.subplots()
 
-    ax1.set(xlabel='Calculation length [days] ', ylabel='Uncertainty (pcm)', title='keff uncertainty evolution')
+    ax1.set(xlabel='Burn up [GWd/t] ', ylabel='Uncertainty (pcm)', title='keff uncertainty evolution')
 
     ax1.grid()
 
-    ax1.plot(x, TOT, 'b', marker='o', label='TOTAL')
-    ax1.plot(x, U8, 'm', marker='o', label='U-238 capture')
+
+
+    ax1.plot(x, TOT, 'b', marker='o', label='TOTAL PTERODAx')
+    ax1.plot(x, U8, 'm', marker='o', label=' U-238 capture')
     ax1.plot(x, Pu, 'brown', marker='o', label='Pu-239 nubar')
+
+
+    ax1.plot(g, P3, 'r--', marker='o', label='SCALE5 participant')
+    ax1.plot(g, P8, 'r--', marker='o')
+
+    ax1.plot(g, P38, 'g--', marker='o', label='SCALE6 participant')
+    ax1.plot(g, P45, 'g--', marker='o')
+
 
     ax1.ticklabel_format(useOffset=False, style='plain')
 
-    ax1.legend(loc='upper left')
+    ax1.legend(loc='lower right')
 
     fig.savefig(model + '/evoUNC.png')
-
-
-
-
 
 
 model = 'UO2/NEW'
@@ -369,8 +410,8 @@ config = CP.ConfigParser()
 config.add_section('sibyl')
 
 config.set('sibyl', 'model', model)
-config.set('sibyl', 'energy', '2')
-config.set('sibyl', 'hetSteps', 'True')
+config.set('sibyl', 'energy', '44')
+config.set('sibyl', 'hetSteps', '2')
 config.set('sibyl', 'fpSwitch', 'False')
 config.set('sibyl', 'hetSwitch', 'False')
 config.set('sibyl', 'daystop', '1.0')
@@ -390,7 +431,7 @@ def main(run):
     if run == 'spesa':
 
         config.set('pterodax', 'run', run)
-        RESP = ['keff', '942390', '922350']
+        RESP = ['keff']#, '942390', '922350']
         PERT = ['922350', '922380', '942390']
         MT = ['452']
 
@@ -399,8 +440,9 @@ def main(run):
     elif run == 'hetero':
 
         config.set('pterodax', 'run', run)
-        maglie = [25, 50, 75, 100, 125, 150, 200, 250]
-        hetStudy(maglie, 'keff', '922380')
+        maglie = [25, 50, 75, 100, 125, 150, 200]
+
+        #hetStudy(maglie, 'keff', '922380')
         plotHET(maglie, 'keff', '922380')
 
     elif run == 'evoPtero':
@@ -415,20 +457,20 @@ def main(run):
 
         EOL = nucData.time[-1]
 
-        PERT = ['922350', '922380', '942390']
-        MT = ['18', '102', '452']
+        #PERT = ['922350', '922380', '942390']
+        #MT = ['18', '102', '452']
 
-        #PERT = ['922380']
-        #MT = ['102']
+        PERT = ['922380', '942390']
+        MT = ['102', '452']
 
         EOL = nucData.time[-1]
         config.set('pterodax', 'run', run)
-        giorni = [0.2, 0.4, 0.6, 0.8, 1.0]
 
-        giorni = [0.4, 1.0]
+        giorni = [0.01, 0.1, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0]
+        giorni = [0.01, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1.0]
 
 
         evoSENS(giorni, 'keff', PERT, MT)
-        plotUNC('EVO_SENS', giorni, EOL, PERT, MT)
+        #plotUNC('EVO_SENS', giorni, EOL, PERT, MT)
 
-main('spesa')
+main('evoSENS')

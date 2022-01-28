@@ -1177,21 +1177,16 @@ def resBlock(sens, name, run):
         with open(name+'.json', 'w') as fp:
             json.dump(R, fp)
 
-
-    elif run == 'hetStudy':
+    elif run == 'hetero':
 
         with open(name+'.json') as fp:
             res_sens = json.load(fp)
 
         R = copy.deepcopy(res_sens)
 
-        if config.hetSteps == True:
+        print(config.hetSteps)
 
-            R[str(nucData.PASSI)]['hetero'] = sens
-
-        elif config.hetSteps == False:
-
-            R[str(nucData.PASSI)]['homo'] = sens
+        R[str(nucData.PASSI)][config.hetSteps] = sens
 
         with open(name+'.json', 'w') as fp:
             json.dump(R, fp)
