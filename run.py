@@ -152,6 +152,9 @@ def evoPtero(giorni, resp, pert):
 
     resDict(giorni, [], model+'/EVO')
 
+    config.set('sibyl', 'hetSteps', '2')
+    config.set('sibyl', 'energy', '2')
+
     config.set('pterodax', 'PERT_NUC', pert)
     config.set('pterodax', 'RESP_NUC', '942390')
     config.set('pterodax', 'RESPONSE', resp)
@@ -167,8 +170,13 @@ def evoPtero(giorni, resp, pert):
 
         print('\nCalculation ' + str(i + 1) + '/' + str(tot))
 
-        avgDT = 15
+        avgDT = 25
         steps = round(EOL*m/avgDT)
+        config.set('sibyl', 'hetSteps', '2')
+
+        if m == 0.01:
+            steps = 20
+            config.set('sibyl', 'hetSteps', '0')
 
         config.set('sibyl', 'PASSI', str(steps))
         config.set('sibyl', 'daystop', str(m))
@@ -314,9 +322,12 @@ def plotUNC(name, giorni, EOL, PERT, MT):
 
     pcm = 1E+5
 
-    TOT = [0]
-    U8  = [0]
-    Pu  = [0]
+    gio = [k for k in res_sens.keys()]
+
+    TOT = []
+    U8  = []
+    U5  = []
+    Pu  = []
 
     test = 0
 
@@ -326,6 +337,7 @@ def plotUNC(name, giorni, EOL, PERT, MT):
 
             tot = 0
             u8  = 0
+            u5  = 0
             pu  = 0
 
             for p in PERT:
@@ -338,21 +350,31 @@ def plotUNC(name, giorni, EOL, PERT, MT):
 
                     unc = abs(tramezzino(bun[::-1], bun, mtx)) ** 0.5
 
+                    if g == giorni[-1]:
+
+                        print([p,m])
+                        print(round(unc*pcm))
+
                     tot += unc ** 2
 
-                    if [p,m] == ['922380', '102']:
+                    if [p,m] == ['922380', '102'] or p == '922380':
 
                         u8 += unc ** 2
 
-                    if  [p,m] == ['942390', '452']:
+                    if  [p,m] == ['942390', '452'] or p == '942390':
 
                         pu += unc ** 2
 
+                    if  [p,m] == ['922350', '18'] or p == '922350':
 
-            TOT.append(tot**0.5*pcm+50)
+                        u5 += unc ** 2
+
+            TOT.append(tot**0.5*pcm)
             U8.append(u8**0.5*pcm)
             Pu.append(pu**0.5*pcm)
+            U5.append(u5**0.5*pcm)
 
+        print(tot**0.5*pcm)
 
 
 
@@ -360,9 +382,9 @@ def plotUNC(name, giorni, EOL, PERT, MT):
     xU8  = [390, 0,0 , 0, 0, 0]
     xPu  = [0 , 0, 0, 0, 0, 0]
 
-    TOT = np.array(xTOT) + np.array(TOT)
-    U8 = np.array(xU8) + np.array(U8)
-    Pu = np.array(xPu) + np.array(Pu)
+    #TOT = np.array(xTOT) + np.array(TOT)
+    #U8 = np.array(xU8) + np.array(U8)
+    #Pu = np.array(xPu) + np.array(Pu)
 
 
     g = [0, 10, 20, 30, 40, 50 ,60]
@@ -373,8 +395,10 @@ def plotUNC(name, giorni, EOL, PERT, MT):
     P45 = [480, 485, 540, 595, 645, 705, 750]
 
 
-    x = np.array([0.0] + giorni) * 60
-    #x = np.array( giorni) * 60
+    #x = np.array([0.0] + giorni) * 60
+    x = np.array( [0.0] + giorni[1:]) * 60
+    Pu[0] = 0
+
 
     fig, ax1 = plt.subplots()
 
@@ -383,22 +407,25 @@ def plotUNC(name, giorni, EOL, PERT, MT):
     ax1.grid()
 
 
-
-    ax1.plot(x, TOT, 'b', marker='o', label='TOTAL PTERODAx')
-    ax1.plot(x, U8, 'm', marker='o', label=' U-238 capture')
-    ax1.plot(x, Pu, 'brown', marker='o', label='Pu-239 nubar')
-
-
     ax1.plot(g, P3, 'r--', marker='o', label='SCALE5 participant')
     ax1.plot(g, P8, 'r--', marker='o')
 
     ax1.plot(g, P38, 'g--', marker='o', label='SCALE6 participant')
     ax1.plot(g, P45, 'g--', marker='o')
 
+    ax1.plot(x, TOT, 'b', marker='o', label='TOTAL PTERODAx')
+
+    ax1.plot(x, Pu, 'brown', marker='o', label='Pu-239 ')
+    ax1.plot(x, U8, 'm', marker='o', label='U-238 ')
+    ax1.plot(x, U5, 'orange', marker='o', label='U-235 ')
+
+
+
+
 
     ax1.ticklabel_format(useOffset=False, style='plain')
 
-    ax1.legend(loc='lower right')
+    ax1.legend(loc='best')
 
     fig.savefig(model + '/evoUNC.png')
 
@@ -449,28 +476,28 @@ def main(run):
 
         EOL = nucData.time[-1]
         config.set('pterodax', 'run', run)
-        giorni = [0.2, 0.4, 0.6, 0.8, 1.0]
-        #evoPtero(giorni, 'keff', '942390')
-        plotEVO('EVO_U8', giorni, 'keff', '922380', EOL)
+        giorni = [0.01, 0.1, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0]
+        evoPtero(giorni, 'keff', '922380')
+        plotEVO('EVO', giorni, 'keff', '922380', EOL)
 
     elif run == 'evoSENS':
 
         EOL = nucData.time[-1]
 
-        #PERT = ['922350', '922380', '942390']
-        #MT = ['18', '102', '452']
+        PERT = ['922350', '922380', '942390']
+        MT = ['18', '102', '452']
 
-        PERT = ['922380', '942390']
-        MT = ['102', '452']
+        #PERT = ['922380', '942390']
+        #MT = ['102', '452']
 
         EOL = nucData.time[-1]
         config.set('pterodax', 'run', run)
 
         giorni = [0.01, 0.1, 0.2, 0.3, 0.4, 0.6, 0.8, 1.0]
-        giorni = [0.01, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1.0]
+        #giorni = [0.01, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.75, 1.0]
 
 
-        evoSENS(giorni, 'keff', PERT, MT)
-        #plotUNC('EVO_SENS', giorni, EOL, PERT, MT)
+        #evoSENS(giorni, 'keff', PERT, MT)
+        plotUNC('EVO_SENS', giorni, EOL, PERT, MT)
 
-main('evoSENS')
+main('evoPtero')
