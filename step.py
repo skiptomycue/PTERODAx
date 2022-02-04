@@ -1390,8 +1390,6 @@ def paraPlot(para, name, **kwargs):
             ax2.plot(x2, y2, 'r', label = 'SERPENT')
             ax2.legend(loc='upper center')
 
-
-
     ax1.grid()
 
     ax1.plot(x, y1, 'b', label = 'SIBYL DIRECT')
@@ -1403,7 +1401,7 @@ def paraPlot(para, name, **kwargs):
 
 def adjoPlot(res, adjoRes, **kwargs):
 
-    x = nucData.tempo
+    x = nucData.tempo / nucData.giorni * nucData.dep.burnup[-1]
     g = []
     X = []
     c = 1
@@ -1439,7 +1437,7 @@ def adjoPlot(res, adjoRes, **kwargs):
     j = 0
 
 
-    lab.extend(['TOTAL DPT'])
+    lab.extend(['TOTAL PTERODAx'])
     col.extend(['b--'])
 
     for z in PERT:
@@ -1457,13 +1455,13 @@ def adjoPlot(res, adjoRes, **kwargs):
 
         name = nucData.nuc[k].name
 
-        ax1.set(xlabel='BU (days)', ylabel='Gross Sensitivity', title=name+' contributions to EOL '+title+'  (rel. error)')
-
+        ax1.set(xlabel='BU (days)', ylabel='Reactivity change (pcm)', title=name+' contributions to EOL '+title+'  (rel. error)')
+        ax1.ticklabel_format(useOffset=False, style='plain')
         i = 0
         b = 0
 
         for a in np.array(adjoRes.ind).transpose()[k]:
-            ax1.plot(x, a*nn*c, col[i], label=lab[i])
+            ax1.plot(x, a*nn*c*pcm, col[i], label=lab[i])
             i += 1
             b += a
 
@@ -1472,9 +1470,9 @@ def adjoPlot(res, adjoRes, **kwargs):
 
         if z in PERT:
             kk = PERT.index(z)
-            y = np.ones(len(x)) * sibyl[kk] * c
-            ax1.plot(x, y, 'r--', markersize=15, label='pert')
-            ax1.vlines(0, np.array(adjoRes.ind).transpose()[k][-1][0]*nn*c, y[0], linewidth=10, label='error')
+            y = np.ones(len(x)) * sibyl[kk] * c * pcm
+            ax1.plot(x, y, 'r--', markersize=15, label='SIBYL DIRECT')
+            #ax1.vlines(0, np.array(adjoRes.ind).transpose()[k][-1][0]*nn*c, y[0], linewidth=10, label='error')
 
             g.append([np.array(adjoRes.ind)[0][j][k] * c * nn for j in range(len(lab))] + [sibyl[kk] *c ])
             X.append(name)

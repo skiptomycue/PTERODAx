@@ -30,9 +30,17 @@ giorni = dep.days[-1]*dayStop
 T = dep.days[-1]*24*3600
 MXT=ST.MicroXSTuple
 
+plt.rcParams.update({'font.size': 22})
+plt.rcParams.update({'lines.linewidth': 3})
+plt.rcParams['lines.markersize'] = 10
+plt.rcParams.update({'figure.figsize': (15, 12)})
+plt.rcParams.update({'figure.max_open_warning': 60})
+plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
 ### TIME STEPS ###
 
 def buildTempo(PASSI, half):
+
+    giorni = 2500
 
     pass1 = 5
     pass2 = round(giorni*0.1)
@@ -42,6 +50,7 @@ def buildTempo(PASSI, half):
     het1 = round(PASSI*0.1)
     het2 = round(PASSI*0.15)
     het3 = PASSI -2*(het1+het2)
+    het4 = PASSI - (het1 + het2)
 
     if half == '2':
 
@@ -49,8 +58,7 @@ def buildTempo(PASSI, half):
 
     elif half == '1':
 
-        het3 = PASSI - (het1+het2)
-        tempo = np.linspace(0, pass1, het1).tolist() + np.linspace(pass1, pass2, het2).tolist()[1:] + np.linspace(pass2, giorni, het3).tolist()[1:]
+        tempo = np.linspace(0, pass1, het1).tolist() + np.linspace(pass1, pass2, het2).tolist()[1:] + np.linspace(pass2, giorni, het4).tolist()[1:]
 
 
     elif half == '0':
@@ -61,6 +69,40 @@ def buildTempo(PASSI, half):
 
         print('errore in hetStep')
 
+    x = [0, pass1, pass2, pass3, pass4, giorni]
+
+    x = [str(int(a)) for a in x]
+
+    zero = [giorni/PASSI]*len(x)
+    due  = [0] + [(pass1-0)/het1, (pass2-pass1)/het2, (pass3-pass2)/het3, (pass4-pass3)/het2, (giorni-pass4)/het1]
+    uno  = [0] + [(pass1-0)/het1, (pass2-pass1)/het2, (giorni-pass2)/het4, (giorni-pass2)/het4, (giorni-pass2)/het4]
+
+
+    x     =   x [:3] +  [500, 1000, 1500, 2000]  + x[3:]
+    uno   =  uno[:3] +  [uno[3]]  * 4 +  uno[3:]
+    due   =  due[:3] +  [due[3]]  * 4 +  due[3:]
+    zero  = zero[:3] +  [zero[3]] * 4 + zero[3:]
+
+
+    fig, ax1 = plt.subplots()
+
+    ax1.set(xlabel='BU (days)', ylabel='step length [days]' )
+
+    ax1.grid()
+
+    ax1.step(x, zero, 'r', label='homogeneous', where='pre', linewidth = 6)
+    ax1.step(x, uno, 'g', label='heterogeneous 1', where='pre', linewidth = 6)
+    ax1.step(x, due, 'b', label='heterogeneous 2', where='pre', linewidth = 6)
+    ax1.step(x, uno, 'g--', linewidth = 6)
+
+    ax1.legend(loc='best')
+
+    fig.savefig(model + '/tempo.png')
+
+    return tempo
+
+
+
     return tempo
 
 tempo = buildTempo(PASSI, config.hetSteps)
@@ -68,6 +110,8 @@ tempo = buildTempo(PASSI, config.hetSteps)
 steps = len(tempo)
 #nodo = min([int(len(dep.days)/2),int(len(tempo)/2)])
 nodo = 5
+
+
 
 
 ### SERPENT ###
