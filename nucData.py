@@ -40,10 +40,8 @@ plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
 
 def buildTempo(PASSI, half):
 
-    giorni = 2500
-
-    pass1 = 5
-    pass2 = round(giorni*0.1)
+    pass1 = 3
+    pass2 = round(giorni*0.2)
     pass3 = giorni - pass2
     pass4 = giorni - pass1
 
@@ -701,4 +699,4 @@ endNuc = datetime.now()
 
 nuc[ZAI.index('922350')].name = 'Uranium-235'
 nuc[ZAI.index('922380')].name = 'Uranium-238'
-nuc[ZAI.index('942390')].name = 'Plutonium-239'
+#nuc[ZAI.index('942390')].name = 'Plutonium-239'

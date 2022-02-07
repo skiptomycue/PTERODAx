@@ -26,6 +26,7 @@ resetK   = config.resetK
 direct   = config.direct
 run      = config.run
 
+PERT = ['922350', '922380', '50100', '280580']
 
 sens_formula = False
 ### INITS ###
@@ -1055,14 +1056,14 @@ def adjoStep(res, **kwargs):
 
 
                 #Ns1  = onix.salameche.CRAM16((-SM)*(dt), np.array(Ns2))
-                Ns1 = SM.dot(Ns2)
-                #Ns1 = Ns2
+                #Ns1 = SM.dot(Ns2)
+                Ns1 = Ns2.copy()
 
                 # adjoint power normalization
 
                 PL=fun.updatePL(fun.pl, rr)
-                R=fun.onixR(PL)
-                Ps=fun.I([Ns1,SS],[No,N],R, dt) / P
+                R=fun.Bateman(rr) - fun.onixD(PL)
+                Ps=fun.I([Ns2,SS],[No,N],R, dt) / P
 
                 adjoRes.pow.append(Ps)
 
@@ -1095,7 +1096,7 @@ def adjoStep(res, **kwargs):
                 b = (fun.boltzF(No*where, sig, v).dot(Psi).dot(Gp))/(fun.boltzF(No*where, sig, v).dot(Psi).dot(Gh))
                 c = (fun.Boltz(dNc * where, sig, v, 1 / k).dot(Psi).dot(Gp)) / (fun.Boltz(dNc * where, sig, v, 1 / k).dot(Psi).dot(Gh))
 
-                G = Gp + c*Gh*1 -b*Gh*0
+                G = Gp + c*Gh*0 -b*Gh*1
 
                 adjoRes.flux.append(G)
 
@@ -1110,6 +1111,10 @@ def adjoStep(res, **kwargs):
                     ssk  = [fun.boltzF(No * where, sig, v, ).dot(Psi).dot(G) * (fun.kSens(Gh, Psi, No, k, j, v))  for j in range(len(N))]
                     sk   = [sk[j] + skk[j] for j in range(len(N))]
 
+                    skk[p] = 0
+                    skk[q] = 0
+
+
                 lam = 1 / k
 
                 Beta = fun.beta(Psi, lam, No, v)
@@ -1122,7 +1127,7 @@ def adjoStep(res, **kwargs):
                 dir_2= [dir_2[j] + Ns1[j]-Ns2[j] for j in range(Beta.shape[0])]
 
                 Ns  = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
-                Nss = [Ns[j]  + skk[j]  for j in range(Beta.shape[0])]
+                Nss = [Ns[j]  + skk[j]*0  for j in range(Beta.shape[0])]
 
 
                 print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
