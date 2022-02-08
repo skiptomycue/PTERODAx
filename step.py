@@ -52,7 +52,7 @@ reg = 3
 plt.rcParams.update({'font.size': 22})
 plt.rcParams.update({'lines.linewidth': 4})
 plt.rcParams['lines.markersize'] = 10
-plt.rcParams.update({'figure.figsize': (18, 10)})
+plt.rcParams.update({'figure.figsize': (15, 10)})
 plt.rcParams.update({'figure.max_open_warning': 60})
 plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
 
@@ -61,20 +61,23 @@ plt.rcParams.update({'axes.formatter.limits' : (-3,3)})
 def zeroStep(At, sig):
 
     res  = fun.Results()
-    resK = 1
     # flux shape algebra
 
     N = np.array(At) * where  # / np.array([nucData.VOL] * len(At)).transpose()
     k = fun.crushK(N, sig, 0, 0.5, 2)
+    resK = k
     #k=fun.findK(N, 0)
     print(k)
+    At1 = At.copy()
 
     if resetK == True:
 
-        resK = k
+        resK = 1.06
         SM   = fun.moveCR(At,0,resK)
-        N    = SM.dot(At) * where
+        At1  = SM.dot(At)
+        N    = At1 * where
         res.ind.append(SM)
+        k = resK
 
 
     A  = fun.Boltz(N, sig, 0, 1 / k)
@@ -117,13 +120,13 @@ def zeroStep(At, sig):
 
     #fun.plotBU(np.matrix(C), 'Depletion_mtx')
 
-    return res, resK
+    return res, resK, At1
 
 def directStep(At, sig):
 
-    res, resK = zeroStep(At,sig)
+    res, resK, At1 = zeroStep(At,sig)
 
-    res.comp.append(At)
+    res.comp.append(At1)
 
 
     for i in range(n-1):
@@ -1003,6 +1006,7 @@ def adjoStep(res, **kwargs):
             Nss = Ns.copy()
 
             SS=Ns.copy()
+            Ns2=Ns.copy()
 
             for i in range(n-1):
 
@@ -1043,7 +1047,7 @@ def adjoStep(res, **kwargs):
 
                 adjoRes.comp.append(Ns)
 
-                adjoRes.ind.append([ind_2,dir_1,ind_1, skk, dir_2, Nss])
+                adjoRes.ind.append([ind_2,dir_1,ind_1, sk,  Ns])
 
                 dt = (nucData.tempo[v+1] - nucData.tempo[v]) * 24 * 3600
 
@@ -1059,11 +1063,12 @@ def adjoStep(res, **kwargs):
                 #Ns1 = SM.dot(Ns2)
                 Ns1 = Ns2.copy()
 
+
                 # adjoint power normalization
 
                 PL=fun.updatePL(fun.pl, rr)
                 R=fun.Bateman(rr) - fun.onixD(PL)
-                Ps=fun.I([Ns2,SS],[No,N],R, dt) / P
+                Ps=fun.I([Ns1,SS],[No,N],R, dt) / P
 
                 adjoRes.pow.append(Ps)
 
@@ -1103,16 +1108,8 @@ def adjoStep(res, **kwargs):
                 # step condition
 
 
-                if resetK == True:
-
-                    IMP  = (Ns[p] * No[p] + Ns[q] * No[q]) / ((fun.kSens(Gh, Psi, No, k, p, v)) * No[p] + (fun.kSens(Gh, Psi, No, k, q, v)) * No[q])
-                    IMP2 = Ns[p] / (fun.kSens(Gh, Psi, No, k, p, v))
-                    skk  = [(fun.kSens(Gh, Psi, No, k, j, v)) * IMP * (No[j]/No[p])**0 for j in range(len(N))]
-                    ssk  = [fun.boltzF(No * where, sig, v, ).dot(Psi).dot(G) * (fun.kSens(Gh, Psi, No, k, j, v))  for j in range(len(N))]
-                    sk   = [sk[j] + skk[j] for j in range(len(N))]
-
-                    skk[p] = 0
-                    skk[q] = 0
+                    #skk[p] = 0
+                    #skk[q] = 0
 
 
                 lam = 1 / k
@@ -1126,14 +1123,27 @@ def adjoStep(res, **kwargs):
                 dir_1= [dir_1[j] + Ns2[j]-Ns[j] for j in range(Beta.shape[0])]
                 dir_2= [dir_2[j] + Ns1[j]-Ns2[j] for j in range(Beta.shape[0])]
 
-                Ns  = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  for j in range(Beta.shape[0])]
-                Nss = [Ns[j]  + skk[j]*0  for j in range(Beta.shape[0])]
+
+
+                if resetK == True:
+
+
+                    NR = res.comp[-1][respId]
+
+                    IMP  = (Ns[p] * No[p] + Ns[q] * No[q]) / ((fun.kSens(Gh, Psi, No, k, p, v)) * No[p] + (fun.kSens(Gh, Psi, No, k, q, v)) * No[q])
+                    IMP2 = Ns[p] / (fun.kSens(Gh, Psi, No, k, p, v))
+                    skk  = [-(fun.kSens(Gh, Psi, No, k, j, v)) * IMP2 for j in range(len(N))]
+                    #skk  = [fun.boltzF(No * where, sig, v, ).dot(Psi).dot(G) * (fun.kSens(Gh, Psi, No, k, j, v))  for j in range(len(N))]
+                    sk   = [sk[j] + skk[j] for j in range(len(N))]
+
+                Ns  = [Ns1[j]  + (np.inner(G, Beta[j]) - (Ps * Pi[j]))  + skk[j]*1 for j in range(Beta.shape[0])]
+                Nss = [Ns[j]  + skk[j]*1  for j in range(Beta.shape[0])]
 
 
                 print('\t'+str(math.ceil(i / n * 100)) + "% complete", end='\r')
                 sys.stdout.flush()
 
-            adjoRes.ind.append([ind_2, dir_1, ind_1, skk, dir_2, Nss])
+            adjoRes.ind.append([ind_2, dir_1, ind_1, sk, Ns])
 
         else:
 
@@ -1426,8 +1436,8 @@ def adjoPlot(res, adjoRes, **kwargs):
 
         if resetK == True:
 
-            lab.extend(['k-reset', 'reshuffling'])
-            col.extend(['m', 'hotpink'])
+            lab.extend(['k-reset'])
+            col.extend(['m'])
 
 
     if resp == 'keff':
@@ -1525,6 +1535,11 @@ def adjoPlot(res, adjoRes, **kwargs):
         i = i + 1
 
 
+    thresh = pcm*min([abs(a[-1]+ a[3] + a[1] + a[2]) for a in np.array(g).transpose()+1E-6])
+
+    thresh = 1E-2
+
+
     for j in range(len(erro)):
 
         string = '%.1f' % (erro[j]) + '%'
@@ -1532,16 +1547,28 @@ def adjoPlot(res, adjoRes, **kwargs):
         if pcm == 1E+5:
             string = '%.1f' % (erro[j]) + '% ('+str(abs(int(erro[j]*g[j][-1]*pcm/100)))+' pcm)'
 
-        if abs(erro[j]) > 100 or abs(sibyl[j]*pcm) < 1:
-            string = '      NR'
+        if abs(erro[j]) >= 100 or abs(sibyl[j]*pcm*c) < thresh*0.2:
+            string = '  NR'
 
-        if g[j][-2] > 0:
-            ax3.annotate(string, (xx[j] -2*w, max(g[j]) * 1.1 * pcm))
+
+        if g[j][-1] >= 0:
+            ax3.annotate(string, (xx[j] +1*w, g[j][-1] * 1.1 * pcm))
 
         else:
-            ax3.annotate(string, (xx[j] -2*w, min(g[j]) * 1.6 * pcm))
+            ax3.annotate(string, (xx[j] +1*w, g[j][-1] * 1.6 * pcm))
 
-    ax3.set_yscale('symlog', linthresh=pcm*min([abs(a[-1]+a[0]) for a in np.array(g).transpose()+1E-6]))
+
+
+        #if g[j][-2] > 0:
+        #    ax3.annotate(string, (xx[j] -2*w, max(g[j]) * 1.1 * pcm))
+
+        #else:
+        #    ax3.annotate(string, (xx[j] -2*w, min(g[j]) * 1.6 * pcm))
+
+
+
+
+    ax3.set_yscale('symlog', linthresh=thresh)
     ax3.set(xlabel='\n1% Perturbed BOL isotope', ylabel='EOL '+title,
             title='PTERODAx contributions to EOL '+title+'  (rel. error)')
     ax3.legend(loc='best')
