@@ -1132,7 +1132,7 @@ def adjoStep(res, **kwargs):
 
                     IMP  = (Ns[p] * No[p] + Ns[q] * No[q]) / ((fun.kSens(Gh, Psi, No, k, p, v)) * No[p] + (fun.kSens(Gh, Psi, No, k, q, v)) * No[q])
                     IMP2 = Ns[p] / (fun.kSens(Gh, Psi, No, k, p, v))
-                    skk  = [-(fun.kSens(Gh, Psi, No, k, j, v)) * IMP2 for j in range(len(N))]
+                    skk  = [-(fun.kSens(Gh, Psi, No, k, j, v)) * IMP for j in range(len(N))]
                     #skk  = [fun.boltzF(No * where, sig, v, ).dot(Psi).dot(G) * (fun.kSens(Gh, Psi, No, k, j, v))  for j in range(len(N))]
                     sk   = [sk[j] + skk[j] for j in range(len(N))]
 

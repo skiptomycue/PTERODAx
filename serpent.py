@@ -229,3 +229,29 @@ POW = 58.3E+6
 INP = 'INP'
 
 buildDict(model6, VOL, REG, UNI, DET, ZAI, MAT, POW, INP)
+
+
+
+model7 = 'UO2/GPT'
+
+volZr = 2.16817E-01
+volHe = 2.84600E-02
+volClad = volZr + volHe
+volFuel = 6.92643E-01
+volCool = 1.14346E+00
+
+VOL=[[volFuel], [volClad], [volCool]]
+REG=['Fuel', 'Cladding', 'Coolant']
+UNI=['1000','1001','1002']
+DET=['REG1', 'REG2', 'REG3']
+MAT=[['Fuel'], ['Clad'], ['Water']]
+
+ZAI1 = ['531350','541350', '601490', '611490', '621490', '922340', '922350', '922380', '922390', '932390', '942390', '942400']
+ZAI2 = ['400900', '80160']
+ZAI3 = ['10010', '80160']
+ZAI  = [ZAI1,ZAI2,ZAI3]
+
+POW = 1.55E+2
+INP = 'INP'
+
+buildDict(model7, VOL, REG, UNI, DET, ZAI, MAT, POW, INP)
