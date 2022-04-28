@@ -1343,6 +1343,44 @@ def massPlot(res):
 
     return
 
+def rodPlot(res):
+
+    dep = ST.read(nucData.file+'/'+nucData.input+'_dep.m')
+
+    mat = nucData.MAT
+
+    p = nucData.ZAI.index('280580')
+
+
+    rod = [-27, -38.63132848808469, -41.59505288287059, -42.86710416492189, -43.9883807606666, -44.66843165125186, -45.47009831791853, -46.473630656227165, -46.825875012136905, -47.277599150067914, -47.98216119386355, -48.355675933092556, -48.66081649534152, -48.918284849771844, -49.420178789165796, -49.467484725238805, -49.89217426772251, -50.25360283915113, -50.61705522010352, -50.761297644346044, -51.00829764434602, -51.692832528067, -51.71949919473339, -51.776379928678395, -52.49154386310467, -52.88571052977137, -53.56315039231438, -54.011860069733814, -54.76668765594071, -55.41224321149623, -56.056505506578276, -56.65294995102281, -57.820828738901646, -58.975366183835554, -59.54607325454259, -60.746201459670864, -62.044597033668154, -63.24232639146635, -64.5608240440485, -64.97233548195703, -66.77517701201172, -68.28726034534509, -69.6353237256269, -71.52421261451616]
+    y1 = np.array([a[p] for a in res.comp]) * nucData.getMM('280580') / 6.022E+23 /1000
+
+    x  = nucData.tempo
+
+    x2 = range(44)
+
+    fig, ax2 = plt.subplots()
+
+    ax2.set(xlabel='BU (days)', ylabel='Nickel-58 mass [kg]')
+    ax2.grid()
+
+
+    ax1 = ax2.twinx()
+    ax1.set(xlabel='BU (days)', ylabel='Control rod position [cm]')
+    ax2.plot(x, y1, 'b', label = 'SIBYL')
+
+    ax1.plot(x2, rod, 'r', label = 'SERPENT')
+
+    ax2.legend(loc='lower left')
+    ax1.legend(loc='upper right')
+
+    #ax2.set_ylim(-30, -70)
+
+    fig.savefig(model+'/rod.png')
+
+    return
+
+
 def printRes(res, **kwargs):
 
     print('\n\nResults')
@@ -1822,11 +1860,14 @@ def main(**kwargs):
         endD = datetime.now()
         endA = datetime.now()
 
+    rodPlot(res)
+
     printTime(startD, endD, startA, endA)
 
     return
 
 main(ptero=RESPONSE, ND=ND)
+
 
 ### chrono ###
 
